@@ -34,8 +34,18 @@ export class FarmItemUI extends PIXI.Container {
 
     const collectAction = (e: any) => {
       e?.stopPropagation();
+      
       if (this.isReady) {
+        this.isReady = false; 
+        
+        this.coin.visible = false;
+        gsap.killTweensOf(this.coin);
+
+        this.bg.visible = true;
+        this.fill.visible = true;
+
         this.events.emit("collect-coin", { id: this.id, amount: this.rewardAmount });
+
         gsap.fromTo(
           this.scale,
           { x: this.baseScale * 1.3, y: this.baseScale * 1.3 },
@@ -44,8 +54,8 @@ export class FarmItemUI extends PIXI.Container {
       }
     };
 
-    this.coin.on("pointerdown", collectAction);
     this.coin.on("pointerover", collectAction);
+    this.coin.on("pointerdown", collectAction);
 
     this.addChild(this.bg, this.fill, this.coin);
   }
@@ -66,7 +76,6 @@ export class FarmItemUI extends PIXI.Container {
       this.bg.visible = false;
       this.fill.visible = false;
       this.coin.visible = true;
-      
       this.coin.y = this.coinStartY;
 
       gsap.fromTo(
@@ -87,15 +96,16 @@ export class FarmItemUI extends PIXI.Container {
       this.bg.visible = true;
       this.fill.visible = true;
       this.coin.visible = false;
-
       gsap.killTweensOf(this.coin);
-      this.coin.y = this.coinStartY; 
     }
 
     if (!this.isReady) {
+      this.bg.visible = true;
+      this.fill.visible = true;
+      
       this.fill
         .clear()
-        .roundRect(-25, -5, 50 * data.progress, 10, 5)
+        .roundRect(-25, -5, Math.max(1, 50 * data.progress), 10, 5)
         .fill(0x00ff00);
     }
   }

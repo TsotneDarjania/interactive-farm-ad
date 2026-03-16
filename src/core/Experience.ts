@@ -32,20 +32,12 @@ export class Experience {
     this.init(threeCanvas, pixiCanvas);
   }
 
-  private async init(
-    threeCanvas: HTMLCanvasElement,
-    pixiCanvas: HTMLCanvasElement,
-  ) {
+  private async init(threeCanvas: HTMLCanvasElement, pixiCanvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
     this.scene.fog = new THREE.Fog(0x87ceeb, 1, 250);
 
-    this.camera = new THREE.PerspectiveCamera(
-      this.targetFOV,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000,
-    );
+    this.camera = new THREE.PerspectiveCamera(this.targetFOV, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(60, 50, 60);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -110,11 +102,14 @@ export class Experience {
     const path = `/gltf/${objectName}.glb`;
     const config = SpawnConfig[objectName] || DefaultConfig;
 
+    const wrapper = new THREE.Group();
+    wrapper.position.copy(targetPos);
+    this.scene.add(wrapper);
+
     this.loader.load(
       path,
       (gltf) => {
         const model = gltf.scene;
-        const wrapper = new THREE.Group();
 
         if (gltf.animations.length > 0) {
           const mixer = new THREE.AnimationMixer(model);
@@ -132,8 +127,8 @@ export class Experience {
         model.scale.multiplyScalar(scaleFactor);
 
         model.position.sub(center.multiplyScalar(scaleFactor));
+        
         wrapper.add(model);
-        wrapper.position.copy(targetPos);
 
         wrapper.traverse((c) => {
           if ((c as THREE.Mesh).isMesh) {
@@ -142,13 +137,12 @@ export class Experience {
           }
         });
 
-        this.scene.add(wrapper);
         config.animation(wrapper);
 
         if (objectName !== ObjectType.FENCE) {
           const id = `animal_${Date.now()}_${Math.random()}`;
-
           const itemData = UI_ITEMS.find((i) => i.id === objectName);
+          
           const rewardAmount = itemData ? itemData.price : 20;
 
           const newItem = new FarmAnimal(id, objectName, wrapper, rewardAmount);
@@ -179,19 +173,14 @@ export class Experience {
 
   private async loadGround(path: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.loader.load(
-        path,
-        (gltf) => {
+      this.loader.load(path, (gltf) => {
           this.ground = gltf.scene;
           this.ground.traverse((c) => {
             if ((c as THREE.Mesh).isMesh) c.receiveShadow = true;
           });
           this.scene.add(this.ground);
           resolve();
-        },
-        undefined,
-        reject,
-      );
+        }, undefined, reject);
     });
   }
 
@@ -222,14 +211,8 @@ export class Experience {
 
     const uiData: any[] = [];
     this.farmItems.forEach((item) => {
-      const data = item.getUIData(
-        this.camera,
-        window.innerWidth,
-        window.innerHeight,
-      );
-      if (data) {
-        uiData.push(data);
-      }
+      const data = item.getUIData(this.camera, window.innerWidth, window.innerHeight);
+      if (data) uiData.push(data);
     });
 
     this.events.emit("sync-world-ui", uiData);
@@ -242,33 +225,18 @@ export class Experience {
 
   public moveCameraToPlayPosition() {
     const isMobile = window.innerWidth < 768;
-
-    const targetPos = isMobile
-      ? { x: 20, y: 20, z: 0 } 
-      : { x: 30, y: 25, z: 0 }; 
-
-
-    const targetLookAt = isMobile
-      ? { x: 2, y: 4.7, z: -6.5 } 
-      : { x: 10.5, y: 4.7, z: -6.5 }; 
+    const targetPos = isMobile ? { x: 20, y: 20, z: 0 } : { x: 30, y: 25, z: 0 }; 
+    const targetLookAt = isMobile ? { x: 2, y: 4.7, z: -6.5 } : { x: 10.5, y: 4.7, z: -6.5 }; 
 
     gsap.to(this.camera.position, {
-      x: targetPos.x,
-      y: targetPos.y,
-      z: targetPos.z,
-      duration: 3,
-      ease: "power2.inOut",
-      onUpdate: () => {
-        this.controls.update();
-      },
+      x: targetPos.x, y: targetPos.y, z: targetPos.z,
+      duration: 3, ease: "power2.inOut",
+      onUpdate: () => { this.controls.update(); },
     });
 
     gsap.to(this.controls.target, {
-      x: targetLookAt.x,
-      y: targetLookAt.y,
-      z: targetLookAt.z,
-      duration: 3,
-      ease: "power2.inOut",
+      x: targetLookAt.x, y: targetLookAt.y, z: targetLookAt.z,
+      duration: 3, ease: "power2.inOut",
     });
   }
 }

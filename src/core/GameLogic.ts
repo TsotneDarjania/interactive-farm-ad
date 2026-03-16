@@ -1,7 +1,7 @@
 import { Experience } from "./Experience";
 import { UI } from "./UI";
 import { ObjectType, UI_ITEMS } from "../constants/types";
-import { Howl } from "howler"; // 🎧
+import { Howl } from "howler";
 
 export class GameLogic {
   private experience: Experience;
@@ -9,8 +9,10 @@ export class GameLogic {
   private gold = 25;
   private tutorialPhase = 0;
   private hasBoughtFence = false;
+  private isGameOver = false;
 
   private coinSound: Howl;
+  private processingIds = new Set<string>();
 
   constructor(experience: Experience, ui: UI) {
     this.experience = experience;
@@ -47,11 +49,16 @@ export class GameLogic {
     });
 
     this.ui.events.on("collect-coin", (data: { id: string, amount: number }) => {
+      if (this.processingIds.has(data.id)) return;
+
+      this.processingIds.add(data.id);
       this.coinSound.play(); 
       
       this.gold += data.amount;
       this.ui.setGameState(this.gold);
       this.experience.resetItemProgress(data.id);
+
+      setTimeout(() => this.processingIds.delete(data.id), 500);
 
       if (this.tutorialPhase === 2) {
         this.tutorialPhase = 3; 
@@ -61,6 +68,8 @@ export class GameLogic {
   }
 
   private handlePurchase(id: string) {
+    if (this.isGameOver) return;
+
     const itemData = UI_ITEMS.find((i) => i.id === id);
     if (!itemData || this.gold < itemData.price) return;
 
@@ -83,7 +92,10 @@ export class GameLogic {
 
     if (id === ObjectType.FENCE) {
       this.hasBoughtFence = true;
-    } else if (this.hasBoughtFence && id !== ObjectType.FENCE) {
+    } 
+    else if (this.hasBoughtFence && id !== ObjectType.FENCE && !this.isGameOver) {
+      this.isGameOver = true; 
+      
       setTimeout(() => {
         this.ui.showEndScreen("https://github.com/TsotneDarjania");
       }, 3000);
