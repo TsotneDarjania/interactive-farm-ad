@@ -9,14 +9,13 @@ import { CurrencyDisplay } from "../ui/CurrencyDisplay";
 import { EndScreenUI } from "../ui/EndScreenUI";
 import type { FarmItemUI } from "../ui/FarmItemUI";
 
-
 export class UI {
   private app: PIXI.Application;
 
   private worldUIContainer = new PIXI.Container();
   private shopMenu: ShopMenuUI;
   private tutorial: TutorialUI;
-  private currencyDisplay: CurrencyDisplay;
+  public currencyDisplay: CurrencyDisplay; // ვისიბილობა შევცვალე public-ზე, რომ GameLogic-მა მიწვდეს
   private endScreen: EndScreenUI; 
   private warningText: PIXI.Text;
 
@@ -24,7 +23,6 @@ export class UI {
   private visualGold = 0;
   private tutorialTarget: { type: "menu" | "world" | "world-spot"; id?: string } | null = null;
   
-  // რუკაზე თითის დასადები კოორდინატი 
   private worldSpotPos: { x: number; y: number } | null = null;
 
   constructor(pixiCanvas: HTMLCanvasElement) {
@@ -70,7 +68,6 @@ export class UI {
 
     this.setupEvents();
     
-    // --- უხილავი აუდიოს განბლოკვა ---
     const unlockAudio = () => {
       if (Howler.ctx && Howler.ctx.state === 'suspended') {
         Howler.ctx.resume();
@@ -78,7 +75,6 @@ export class UI {
       window.removeEventListener("pointerdown", unlockAudio);
     };
     window.addEventListener("pointerdown", unlockAudio);
-    // ---------------------------------
 
     this.app.renderer.on("resize", this.onResize, this);
     this.onResize();
@@ -91,7 +87,6 @@ export class UI {
       globalEvents.emit("try-purchase", id);
     });
 
-    // ვიჭერთ რუკის 2D კოორდინატებს Experience.ts-დან
     globalEvents.on("sync-tutorial-spot", (pos: { x: number; y: number }) => {
       this.worldSpotPos = pos;
     });
@@ -135,7 +130,6 @@ export class UI {
       }
     } 
     else if (this.tutorialTarget.type === "world-spot" && this.worldSpotPos) {
-      // === ახალი ლოგიკა: თითი ადევს რუკის კონკრეტულ წერტილს ===
       this.tutorial.pointFingerAt(this.worldSpotPos.x, this.worldSpotPos.y, responsiveScale);
     } 
     else if (this.tutorialTarget.type === "world") {
@@ -154,6 +148,54 @@ export class UI {
     }
   }
 
+  // === ახალი: კოინების გაფრენის ანიმაცია ===
+  public spawnFlyingCoins(startX: number, startY: number, amountToGive: number, id: string) {
+    const coinCount = Math.min(Math.max(Math.floor(amountToGive / 5), 3), 10); // 3-დან 10 კოინამდე
+    const targetPos = { x: this.currencyDisplay.x + 20, y: this.currencyDisplay.y + 15 };
+
+    for (let i = 0; i < coinCount; i++) {
+      const coin = new PIXI.Text({ text: "💰", style: { fontSize: 24 } });
+      coin.position.set(startX, startY);
+      coin.anchor.set(0.5);
+      
+      // ვიზუალურად ვამატებთ ყველაზე მაღალ შრეზე
+      this.app.stage.addChild(coin);
+
+      const delay = i * 0.1; // რიგ-რიგობით მიფრინავენ
+      const tl = gsap.timeline({
+        delay: delay,
+        onComplete: () => {
+          this.app.stage.removeChild(coin);
+          coin.destroy();
+          // როცა ბოლო კოინი მივა, მაშინ ვისვრით ივენთს რომ ფული დაემატოს
+          if (i === coinCount - 1) {
+            globalEvents.emit("add-gold", { id, amount: amountToGive });
+          }
+        }
+      });
+
+      // კოინი ჯერ ცოტა ზემოთ და გვერდზე ხტება...
+      tl.to(coin.position, {
+        x: startX + (Math.random() - 0.5) * 100,
+        y: startY - 100 - Math.random() * 50,
+        duration: 0.4,
+        ease: "power2.out"
+      });
+
+      // ...და მერე მიფრინავს მიზნისკენ
+      tl.to(coin.position, {
+        x: targetPos.x,
+        y: targetPos.y,
+        duration: 0.6,
+        ease: "back.in(1.5)"
+      });
+      
+      // ფრენის დროს ტრიალებს
+      tl.to(coin, { rotation: Math.PI * 4, duration: 1 }, 0);
+      tl.to(coin.scale, { x: 0.5, y: 0.5, duration: 0.6 }, 0.4);
+    }
+  }
+
   public showWarning(message: string) { /* ... იგივე კოდი ... */ }
   public showEndScreen(url?: string) { /* ... იგივე კოდი ... */ }
   public syncWorldItems(dataArray: any[]) { /* ... იგივე კოდი ... */ }
@@ -169,7 +211,7 @@ export class UI {
       if (this.currencyDisplay) {
         const scale = width < 400 ? 0.7 : 1;
         this.currencyDisplay.scale.set(scale);
-        this.currencyDisplay.x = width - 160 * scale;
+        this.currencyDisplay.x = width - 120 * scale; // შევამცირე margin, რადგან border აღარაა
         this.currencyDisplay.y = 20;
       }
       if (this.warningText && this.warningText.visible) {

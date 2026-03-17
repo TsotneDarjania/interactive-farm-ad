@@ -88,15 +88,15 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
   },
   // === ხორბლის სრული კონფიგურაცია ===
   ["wheat"]: {
-    scale: 3,
-    position: new THREE.Vector3(-8, 5, -2), // <--- y იყოს 0, რომ მიწაზე დადგეს!
-    farmerStandPoint: new THREE.Vector3(-6, 0, -2),
+    scale: 2.5,
+    position: new THREE.Vector3(10.7, 4, -6.5),
+    farmerStandPoint: new THREE.Vector3(5, 3, -7),
     animation: (wrapper) => {
       const targetY = wrapper.position.y;
 
       wrapper.scale.set(0, 0, 0);
       wrapper.rotation.set(0, 0, 0); // საწყისი როტაცია სუფთაა
-      wrapper.position.y = targetY + 20;
+      wrapper.position.y = targetY;
 
       const tl = gsap.timeline();
 
@@ -125,9 +125,16 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
         "-=0.1",
       );
 
-      // 3. გარანტია, რომ როტაცია ზუსტად 0-ზე დადგება ბოლოს
       tl.to(wrapper.rotation, { z: 0, duration: 0.1 });
     },
+  },
+  ["waypoint"]: {
+    scale: 3,
+    position: new THREE.Vector3(10.6, 4.2, -2), // შეცვალე შენი რუკის მიხედვით
+    animation: (wrapper) => {
+      wrapper.scale.set(0, 0, 0);
+      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.6, ease: "back.out" });
+    }
   },
 };
 

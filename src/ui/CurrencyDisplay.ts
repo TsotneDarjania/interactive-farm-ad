@@ -4,38 +4,56 @@ import { gsap } from "gsap";
 export class CurrencyDisplay extends PIXI.Container {
   private text: PIXI.Text;
   private icon: PIXI.Text;
-  private bg: PIXI.Graphics;
 
   constructor(initialAmount: number) {
     super();
 
-    this.bg = new PIXI.Graphics()
-      .roundRect(0, 0, 140, 45, 25)
-      .fill({ color: 0x000000, alpha: 0.5 })
-      .stroke({ width: 2, color: 0xffd700 });
+    // ამოღებულია background border
+    
+    // ხატულა (შეგიძლია სხვა ემოჯით შეცვალო, თუ გინდა)
+    this.icon = new PIXI.Text({ 
+      text: "💰", 
+      style: { 
+        fontSize: 32,
+        dropShadow: {
+          color: 0x000000,
+          alpha: 0.5,
+          blur: 2,
+          distance: 2
+        }
+      } 
+    });
+    this.icon.position.set(0, 0);
 
-    this.icon = new PIXI.Text({ text: "💰", style: { fontSize: 24 } });
-    this.icon.position.set(10, 8);
-
+    // ციფრი
     this.text = new PIXI.Text({
       text: initialAmount.toString(),
       style: {
         fill: "#ffffff",
-        fontSize: 22,
-        fontWeight: "bold",
+        fontSize: 30, // ოდნავ გავზარდე, რადგან ფონი აღარაა
+        fontWeight: "900", // უფრო სქელი შრიფტი
         fontFamily: "Arial",
+        dropShadow: {
+          color: 0x000000,
+          alpha: 0.8,
+          blur: 4,
+          distance: 3
+        }
       },
     });
-    this.text.position.set(45, 10);
+    // ტექსტი იწყება ხატულის მარჯვნივ
+    this.text.position.set(40, 0);
 
-    this.addChild(this.bg, this.icon, this.text);
+    this.addChild(this.icon, this.text);
   }
 
   public updateAmount(newAmount: number) {
-    const current = { val: parseInt(this.text.text) };
+    const current = { val: parseInt(this.text.text) || 0 };
+
     gsap.to(current, {
       val: newAmount,
-      duration: 0.5,
+      duration: 0.5, // ოდნავ უფრო სწრაფი
+      ease: "power2.out",
       onUpdate: () => {
         this.text.text = Math.floor(current.val).toString();
       },
@@ -44,10 +62,12 @@ export class CurrencyDisplay extends PIXI.Container {
     const screenWidth = window.innerWidth;
     const targetScale = screenWidth < 400 ? 0.7 : 1;
 
-    gsap.fromTo(
-      this.scale,
-      { x: targetScale * 1.2, y: targetScale * 1.2 },
-      { x: targetScale, y: targetScale, duration: 0.3 }
-    );
+    // "ხტუნვის" ეფექტი და ფერის შეცვლა
+    const tl = gsap.timeline();
+    tl.to(this.scale, { x: targetScale * 1.3, y: targetScale * 1.3, duration: 0.15, ease: "back.out(2)" }, 0);
+    tl.to(this.text.style, { fill: "#ffd700", duration: 0.15 }, 0); // ოქროსფერი
+    
+    tl.to(this.scale, { x: targetScale, y: targetScale, duration: 0.3, ease: "bounce.out" }, 0.15);
+    tl.to(this.text.style, { fill: "#ffffff", duration: 0.3 }, 0.15); // ისევ თეთრი
   }
 }

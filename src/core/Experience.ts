@@ -10,6 +10,8 @@ import { FarmAnimal } from "../world/FarmAnimal";
 import { globalEvents } from "./EventBus";
 import { Farmer } from "../world/Farmer";
 import { Wheat } from "../world/Wheat";
+import { Waypoint } from "../world/WayPoint";
+import { TutorialPositions } from "../constants/tutorialPositions";
 
 // საერთო ტიპი, რომ მასივმა ორივე კლასი მიიღოს და პროგრესბარები არ აირიოს
 type FarmItem = FarmAnimal | Wheat;
@@ -41,6 +43,8 @@ export class Experience {
   private farmItems: FarmItem[] = [];
 
   private farmer: Farmer | null = null;
+
+  private waypoint: Waypoint | null = null;
 
   constructor(threeCanvas: HTMLCanvasElement, pixiCanvas: HTMLCanvasElement) {
     this.init(threeCanvas, pixiCanvas);
@@ -86,6 +90,8 @@ export class Experience {
 
     this.initLights();
     this.updateCameraFOV();
+    this.spawnWheat(); 
+    this.spawnWaypoint();
 
     try {
       await this.loadGround("/gltf/ground.glb");
@@ -98,6 +104,52 @@ export class Experience {
     this.animate();
     window.addEventListener("resize", () => this.onResize());
   }
+
+  private spawnWaypoint() {
+    const config = SpawnConfig["waypoint"] || DefaultConfig;
+    const pos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
+
+    this.loader.load("/gltf/waypoint.glb", (gltf) => {
+      this.waypoint = new Waypoint(this.scene, pos);
+      this.waypoint.spawn(gltf.scene, config.scale || 1);
+
+      if (config.animation) config.animation(this.waypoint.mesh);
+    });
+  }
+
+  // === ახალი: ფერმერის და კამერის გადაადგილება ===
+  public movePlayerToViewpoint(pointKey: string, onCompleteEvent: string) {
+    const config = TutorialPositions[pointKey];
+    if (!config || !this.farmer) return;
+
+    // ფერმერი მირბის და ასრულებისას ისვრის ივენთს
+    this.farmer.moveToViewpoint(
+      config.playerPos,
+      config.playerRotation,
+      onCompleteEvent,
+    );
+
+    // კამერის მოძრაობა სინქრონულად
+    gsap.to(this.camera.position, {
+      x: config.cameraPos.x,
+      y: config.cameraPos.y,
+      z: config.cameraPos.z,
+      duration: 2.5,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        this.controls.update();
+      },
+    });
+
+    gsap.to(this.controls.target, {
+      x: config.cameraTarget.x,
+      y: config.cameraTarget.y,
+      z: config.cameraTarget.z,
+      duration: 2.5,
+      ease: "power2.inOut",
+    });
+  }
+  // ============================================
 
   private async loadFarmer(): Promise<void> {
     return new Promise((resolve) => {
@@ -369,15 +421,13 @@ export class Experience {
     this.mixers.forEach((m) => m.update(delta));
     if (this.controls?.enabled) this.controls.update();
 
-    // თითის (Tutorial spot) სინქრონიზაცია კონფიგიდან
-    const wheatConfig = SpawnConfig["wheat"] || DefaultConfig;
-    const wheatPos = wheatConfig.position || new THREE.Vector3(0, 0, 0);
-    const wheatScreenPos = wheatPos.clone().project(this.camera);
-
-    globalEvents.emit("sync-tutorial-spot", {
-      x: (wheatScreenPos.x * 0.5 + 0.5) * window.innerWidth,
-      y: -(wheatScreenPos.y * 0.5 - 0.5) * window.innerHeight,
+    // === ახალი ლოგიკა: 3D ბარმა კამერას რომ უყუროს მუდმივად ===
+    this.farmItems.forEach((item) => {
+      if ('update' in item && typeof (item as any).update === 'function') {
+        (item as any).update(this.camera);
+      }
     });
+    // ========================================================
 
     // ყველა ობიექტის UI-ს სინქრონიზაცია (ორივე ტიპისთვის)
     const uiData = this.farmItems
@@ -421,5 +471,16 @@ export class Experience {
       duration: 3,
       ease: "power2.inOut",
     });
+  }
+
+  public triggerWheatScythe() {
+    // ვეძებთ ხორბალს ფერმის ობიექტების მასივში
+    const wheatItem = this.farmItems.find(
+      (item) => item instanceof Wheat,
+    ) as Wheat;
+
+    if (wheatItem && typeof wheatItem.showScythe === "function") {
+      wheatItem.showScythe(); // ვრთავთ ცელის ანიმაციას და პროგრესბარს
+    }
   }
 }
