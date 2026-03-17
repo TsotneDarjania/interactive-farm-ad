@@ -1,13 +1,14 @@
 import { Experience } from "./Experience";
-import { UI } from "./UI";
 import { ObjectType, UI_ITEMS } from "../constants/types";
 import { Howl } from "howler";
+import { globalEvents } from "./EventBus"; 
+import type { UI } from "./UI";
 
 export class GameLogic {
   private experience: Experience;
   private ui: UI;
-  private gold = 25;
-  private tutorialPhase = 0;
+  private gold = 0; 
+  private tutorialPhase = 0; 
   private hasBoughtFence = false;
   private isGameOver = false;
 
@@ -30,39 +31,54 @@ export class GameLogic {
   private init() {
     this.ui.setGameState(this.gold);
 
-    this.experience.events.on("intro-complete", () => {
+    globalEvents.on("intro-complete", () => {
       this.ui.showStartHint();
     });
 
-    this.experience.events.on("sync-world-ui", (uiData) => {
+    globalEvents.on("sync-world-ui", (uiData) => {
       this.ui.syncWorldItems(uiData);
     });
 
-    this.ui.events.on("tutorial-start", () => {
-      this.tutorialPhase = 1;
-      this.ui.showMenu();
-      this.ui.setTutorialTarget({ type: "menu", id: ObjectType.CHICKEN });
+    globalEvents.on("tutorial-start", () => {
+      this.tutorialPhase = 1; 
+      this.ui.showMenu(); 
+      this.ui.setTutorialTarget({ type: "world-spot", id: "wheat" });
+
+      setTimeout(() => {
+        const handleWheatSpawn = () => {
+          if (this.tutorialPhase === 1) {
+            this.tutorialPhase = 2; 
+            this.ui.setTutorialTarget(null); 
+            
+            this.experience.spawnWheat(); 
+
+            window.removeEventListener("pointerdown", handleWheatSpawn);
+          }
+        };
+        window.addEventListener("pointerdown", handleWheatSpawn);
+      }, 500); 
     });
 
-    this.ui.events.on("try-purchase", (id: string) => {
+    globalEvents.on("try-purchase", (id: string) => {
       this.handlePurchase(id);
     });
 
-    this.ui.events.on("collect-coin", (data: { id: string, amount: number }) => {
+    globalEvents.on("collect-coin", (data: { id: string, amount: number }) => {
       if (this.processingIds.has(data.id)) return;
 
       this.processingIds.add(data.id);
       this.coinSound.play(); 
       
-      this.gold += data.amount;
+      const earnedAmount = data.amount > 0 ? data.amount : 25; 
+      this.gold += earnedAmount;
       this.ui.setGameState(this.gold);
       this.experience.resetItemProgress(data.id);
 
       setTimeout(() => this.processingIds.delete(data.id), 500);
 
-      if (this.tutorialPhase === 2) {
+      if (this.tutorialPhase === 2 && this.gold >= 25) {
         this.tutorialPhase = 3; 
-        this.ui.setTutorialTarget(null); 
+        this.ui.setTutorialTarget({ type: "menu", id: ObjectType.CHICKEN }); 
       }
     });
   }
@@ -78,11 +94,11 @@ export class GameLogic {
       return; 
     }
 
-    if (this.tutorialPhase === 1 && id === ObjectType.CHICKEN) {
-      this.tutorialPhase = 2;
+    if (this.tutorialPhase === 3 && id === ObjectType.CHICKEN) {
+      this.tutorialPhase = 4;
       this.ui.setTutorialTarget({ type: "world" }); 
       this.experience.moveCameraToPlayPosition(); 
-    } else if (this.tutorialPhase !== 3) {
+    } else if (this.tutorialPhase < 3) {
       return; 
     }
 

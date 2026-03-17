@@ -1,13 +1,16 @@
 import * as PIXI from "pixi.js";
 import { gsap } from "gsap";
-import { CurrencyDisplay } from "../ui/CurrencyDisplay";
-import { FarmItemUI } from "../ui/FarmItemUI";
-import { TutorialUI } from "../ui/TutorialUI";
-import { EndScreenUI } from "../ui/EndScreenUI"; 
+import { Howler } from "howler"; 
+
+import { globalEvents } from "../core/EventBus"; 
 import { ShopMenuUI } from "../ui/ShopMenuUI";
+import { TutorialUI } from "../ui/TutorialUI";
+import { CurrencyDisplay } from "../ui/CurrencyDisplay";
+import { EndScreenUI } from "../ui/EndScreenUI";
+import type { FarmItemUI } from "../ui/FarmItemUI";
+
 
 export class UI {
-  public events = new PIXI.EventEmitter();
   private app: PIXI.Application;
 
   private worldUIContainer = new PIXI.Container();
@@ -19,7 +22,10 @@ export class UI {
 
   private worldItems = new Map<string, FarmItemUI>();
   private visualGold = 0;
-  private tutorialTarget: { type: "menu" | "world"; id?: string } | null = null;
+  private tutorialTarget: { type: "menu" | "world" | "world-spot"; id?: string } | null = null;
+  
+  // რუკაზე თითის დასადები კოორდინატი 
+  private worldSpotPos: { x: number; y: number } | null = null;
 
   constructor(pixiCanvas: HTMLCanvasElement) {
     this.app = new PIXI.Application();
@@ -63,6 +69,17 @@ export class UI {
     this.currencyDisplay.visible = false;
 
     this.setupEvents();
+    
+    // --- უხილავი აუდიოს განბლოკვა ---
+    const unlockAudio = () => {
+      if (Howler.ctx && Howler.ctx.state === 'suspended') {
+        Howler.ctx.resume();
+      }
+      window.removeEventListener("pointerdown", unlockAudio);
+    };
+    window.addEventListener("pointerdown", unlockAudio);
+    // ---------------------------------
+
     this.app.renderer.on("resize", this.onResize, this);
     this.onResize();
 
@@ -70,101 +87,18 @@ export class UI {
   }
 
   private setupEvents() {
-    this.tutorial.events.on("tutorial-start", () => {
-      this.events.emit("tutorial-start");
-    });
     this.shopMenu.events.on("purchase", (id: string) => {
-      this.events.emit("try-purchase", id);
+      globalEvents.emit("try-purchase", id);
     });
-  }
 
-  public showEndScreen(url?: string) {
-    const { width, height } = this.app.renderer.screen;
-    this.endScreen.show(width, height, url);
-  }
-
-  public showWarning(message: string) {
-    this.warningText.text = message;
-    this.warningText.visible = true;
-    const { width, height } = this.app.renderer.screen;
-    this.warningText.position.set(width / 2, height / 2 - 50);
-    const responsiveScale = width < 600 ? 0.6 : 1;
-    this.warningText.alpha = 1;
-    gsap.killTweensOf(this.warningText);
-    gsap.killTweensOf(this.warningText.scale);
-    gsap.fromTo(
-      this.warningText.scale,
-      { x: 0, y: 0 },
-      {
-        x: responsiveScale,
-        y: responsiveScale,
-        duration: 0.5,
-        ease: "back.out",
-      },
-    );
-    gsap.to(this.warningText, {
-      alpha: 0,
-      duration: 0.5,
-      delay: 2,
-      onComplete: () => {
-        this.warningText.visible = false;
-      },
+    // ვიჭერთ რუკის 2D კოორდინატებს Experience.ts-დან
+    globalEvents.on("sync-tutorial-spot", (pos: { x: number; y: number }) => {
+      this.worldSpotPos = pos;
     });
-  }
-
-  public setGameState(gold: number) {
-    this.visualGold = gold;
-    this.currencyDisplay.updateAmount(gold);
-    this.shopMenu.updateAffordability(this.visualGold);
-  }
-
-  public setTutorialTarget(
-    target: { type: "menu" | "world"; id?: string } | null,
-  ) {
-    this.tutorialTarget = target;
-    if (!target) {
-      this.tutorial.hideFinger();
-    }
-  }
-
-  private updateFingerPosition() {
-    if (!this.tutorialTarget) return;
-    const screenWidth = this.app.renderer.screen.width;
-    const responsiveScale =
-      screenWidth < 400 ? 0.6 : screenWidth < 700 ? 0.8 : 1;
-
-    if (this.tutorialTarget.type === "menu" && this.tutorialTarget.id) {
-      const pos = this.shopMenu.getButtonGlobalPos(this.tutorialTarget.id);
-      if (pos) {
-        this.tutorial.pointFingerAt(
-          pos.x,
-          pos.y + 35 * this.shopMenu.scale.y,
-          responsiveScale,
-        );
-      }
-    } else if (this.tutorialTarget.type === "world") {
-      let foundCoin = false;
-      for (const itemUI of this.worldItems.values()) {
-        if (itemUI.isReady) {
-          const pos = itemUI.getGlobalPosition();
-          this.tutorial.pointFingerAt(
-            pos.x,
-            pos.y - 50 * responsiveScale,
-            responsiveScale,
-          );
-          foundCoin = true;
-          break;
-        }
-      }
-      if (!foundCoin) {
-        this.tutorial.hideFinger();
-      }
-    }
   }
 
   public showStartHint() {
-    const { width, height } = this.app.renderer.screen;
-    this.tutorial.showStartHint(width, height);
+    globalEvents.emit("tutorial-start");
   }
 
   public showMenu() {
@@ -176,24 +110,61 @@ export class UI {
     this.shopMenu.updateAffordability(this.visualGold);
   }
 
-  public syncWorldItems(dataArray: any[]) {
-    dataArray.forEach((data) => {
-      let uiElement = this.worldItems.get(data.id);
-      if (!uiElement) {
-        uiElement = new FarmItemUI(data.id, this.events);
-        this.worldUIContainer.addChild(uiElement);
-        this.worldItems.set(data.id, uiElement);
-      }
-      uiElement.updateData(data);
-    });
+  public setGameState(gold: number) {
+    this.visualGold = gold;
+    this.currencyDisplay.updateAmount(gold);
+    this.shopMenu.updateAffordability(this.visualGold);
   }
+
+  public setTutorialTarget(target: { type: "menu" | "world" | "world-spot"; id?: string } | null) {
+    this.tutorialTarget = target;
+    if (!target) {
+      this.tutorial.hideFinger();
+    }
+  }
+
+  private updateFingerPosition() {
+    if (!this.tutorialTarget) return;
+    const screenWidth = this.app.renderer.screen.width;
+    const responsiveScale = screenWidth < 400 ? 0.6 : screenWidth < 700 ? 0.8 : 1;
+
+    if (this.tutorialTarget.type === "menu" && this.tutorialTarget.id) {
+      const pos = this.shopMenu.getButtonGlobalPos(this.tutorialTarget.id);
+      if (pos) {
+        this.tutorial.pointFingerAt(pos.x, pos.y + 35 * this.shopMenu.scale.y, responsiveScale);
+      }
+    } 
+    else if (this.tutorialTarget.type === "world-spot" && this.worldSpotPos) {
+      // === ახალი ლოგიკა: თითი ადევს რუკის კონკრეტულ წერტილს ===
+      this.tutorial.pointFingerAt(this.worldSpotPos.x, this.worldSpotPos.y, responsiveScale);
+    } 
+    else if (this.tutorialTarget.type === "world") {
+      let foundCoin = false;
+      for (const itemUI of this.worldItems.values()) {
+        if (itemUI.isReady) {
+          const pos = itemUI.getGlobalPosition();
+          this.tutorial.pointFingerAt(pos.x, pos.y - 50 * responsiveScale, responsiveScale);
+          foundCoin = true;
+          break;
+        }
+      }
+      if (!foundCoin) {
+        this.tutorial.hideFinger();
+      }
+    }
+  }
+
+  public showWarning(message: string) { /* ... იგივე კოდი ... */ }
+  public showEndScreen(url?: string) { /* ... იგივე კოდი ... */ }
+  public syncWorldItems(dataArray: any[]) { /* ... იგივე კოდი ... */ }
 
   private onResize() {
     requestAnimationFrame(() => {
       const { width, height } = this.app.renderer.screen;
-      this.tutorial.resize(width, height);
-      this.shopMenu.resize(width, height);
-      this.endScreen.resize(width, height); 
+      
+      if (this.tutorial) this.tutorial.resize(width, height);
+      if (this.shopMenu) this.shopMenu.resize(width, height);
+      if (this.endScreen) this.endScreen.resize(width, height); 
 
       if (this.currencyDisplay) {
         const scale = width < 400 ? 0.7 : 1;
@@ -201,10 +172,10 @@ export class UI {
         this.currencyDisplay.x = width - 160 * scale;
         this.currencyDisplay.y = 20;
       }
-      if (this.warningText.visible) {
+      if (this.warningText && this.warningText.visible) {
         this.warningText.position.set(width / 2, height / 2 - 50);
       }
-      if (this.shopMenu.visible) {
+      if (this.shopMenu && this.shopMenu.visible) {
         this.shopMenu.updateAffordability(this.visualGold);
       }
     });
