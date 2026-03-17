@@ -26,9 +26,9 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
     },
   },
   [ObjectType.FENCE]: {
-    scale: 10,
-    position: new THREE.Vector3(0, 0, 0), // <--- შეცვალე
-    farmerStandPoint: new THREE.Vector3(0, 0, 0),
+    scale: 11,
+    position: new THREE.Vector3(-12, 5, 2), // <--- შეცვალე
+    farmerStandPoint: new THREE.Vector3(-7.5, 0, 1),
     animation: (wrapper) => {
       const targetY = wrapper.position.y;
       wrapper.position.y += 15;
