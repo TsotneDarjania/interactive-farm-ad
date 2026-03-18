@@ -27,7 +27,7 @@ export class Farmer {
     // 2. თავისით ისწორებს ზომას, პოზიციას და როტაციას
     this.mesh.scale.set(1.2, 1.2, 1.2);
     this.mesh.position.set(-1, 4.2, 15);
-    this.mesh.rotation.y = Math.PI;
+    this.mesh.rotation.y = 0
 
     // 3. თავისით ირთავს ჩრდილებს
     this.mesh.traverse((c) => {
@@ -65,31 +65,6 @@ export class Farmer {
       newAction.reset().fadeIn(fadeDuration).play();
       this.currentAction = newAction;
     }
-  }
-
-  public moveTo(targetPos: THREE.Vector3) {
-    this.isMoving = true;
-    const lookPos = new THREE.Vector3(targetPos.x, this.mesh.position.y, targetPos.z);
-    this.mesh.lookAt(lookPos);
-    this.playAnimation("Run");
-
-    const distance = this.mesh.position.distanceTo(lookPos);
-    const speed = 12;
-    const duration = distance / speed;
-
-    gsap.to(this.mesh.position, {
-      x: targetPos.x,
-      z: targetPos.z,
-      duration: duration,
-      ease: "none",
-      onComplete: () => {
-        this.isMoving = false;
-        this.playAnimation("Yes");
-        setTimeout(() => {
-          if (!this.isMoving) this.playAnimation("Idle");
-        }, 1000);
-      }
-    });
   }
 
   // === სენიორული მიდგომა: Promise-ის დაბრუნება ივენთის ნაცვლად ===

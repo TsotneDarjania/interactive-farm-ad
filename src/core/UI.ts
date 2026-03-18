@@ -1,8 +1,8 @@
 import * as PIXI from "pixi.js";
 import { gsap } from "gsap";
-import { Howler } from "howler"; 
+import { Howler } from "howler";
 
-import { globalEvents } from "../core/EventBus"; 
+import { globalEvents } from "../core/EventBus";
 import { ShopMenuUI } from "../ui/ShopMenuUI";
 import { TutorialUI } from "../ui/TutorialUI";
 import { CurrencyDisplay } from "../ui/CurrencyDisplay";
@@ -15,14 +15,17 @@ export class UI {
   private worldUIContainer = new PIXI.Container();
   private shopMenu: ShopMenuUI;
   private tutorial: TutorialUI;
-  public currencyDisplay: CurrencyDisplay; // ვისიბილობა შევცვალე public-ზე, რომ GameLogic-მა მიწვდეს
-  private endScreen: EndScreenUI; 
+  public currencyDisplay: CurrencyDisplay;
+  private endScreen: EndScreenUI;
   private warningText: PIXI.Text;
 
   private worldItems = new Map<string, FarmItemUI>();
   private visualGold = 0;
-  private tutorialTarget: { type: "menu" | "world" | "world-spot"; id?: string } | null = null;
-  
+  private tutorialTarget: {
+    type: "menu" | "world" | "world-spot";
+    id?: string;
+  } | null = null;
+
   private worldSpotPos: { x: number; y: number } | null = null;
 
   constructor(pixiCanvas: HTMLCanvasElement) {
@@ -30,7 +33,7 @@ export class UI {
     this.shopMenu = new ShopMenuUI();
     this.tutorial = new TutorialUI();
     this.currencyDisplay = new CurrencyDisplay(0);
-    this.endScreen = new EndScreenUI(); 
+    this.endScreen = new EndScreenUI(); // <--- ეს უკვე გაქვს
 
     this.warningText = new PIXI.Text({
       text: "",
@@ -62,14 +65,14 @@ export class UI {
     this.app.stage.addChild(this.tutorial);
     this.app.stage.addChild(this.currencyDisplay);
     this.app.stage.addChild(this.warningText);
-    this.app.stage.addChild(this.endScreen);
+    this.app.stage.addChild(this.endScreen); // <--- ენდ სქრინი ემატება
 
     this.currencyDisplay.visible = false;
 
     this.setupEvents();
-    
+
     const unlockAudio = () => {
-      if (Howler.ctx && Howler.ctx.state === 'suspended') {
+      if (Howler.ctx && Howler.ctx.state === "suspended") {
         Howler.ctx.resume();
       }
       window.removeEventListener("pointerdown", unlockAudio);
@@ -91,7 +94,6 @@ export class UI {
       this.worldSpotPos = pos;
     });
   }
-
 
   public showMenu() {
     if (this.currencyDisplay) {
@@ -125,11 +127,9 @@ export class UI {
       if (pos) {
         this.tutorial.pointFingerAt(pos.x, pos.y + 35 * this.shopMenu.scale.y, responsiveScale);
       }
-    } 
-    else if (this.tutorialTarget.type === "world-spot" && this.worldSpotPos) {
+    } else if (this.tutorialTarget.type === "world-spot" && this.worldSpotPos) {
       this.tutorial.pointFingerAt(this.worldSpotPos.x, this.worldSpotPos.y, responsiveScale);
-    } 
-    else if (this.tutorialTarget.type === "world") {
+    } else if (this.tutorialTarget.type === "world") {
       let foundCoin = false;
       for (const itemUI of this.worldItems.values()) {
         if (itemUI.isReady) {
@@ -145,71 +145,89 @@ export class UI {
     }
   }
 
-  // === ახალი: კოინების გაფრენის ანიმაცია ===
   public spawnFlyingCoins(startX: number, startY: number, amountToGive: number, id: string) {
-    console.log(amountToGive)
-    const coinCount = Math.min(Math.max(Math.floor(amountToGive / 5), 3), 10); // 3-დან 10 კოინამდე
+    const coinCount = Math.min(Math.max(Math.floor(amountToGive / 5), 4), 12); 
     const targetPos = { x: this.currencyDisplay.x + 20, y: this.currencyDisplay.y + 15 };
 
     for (let i = 0; i < coinCount; i++) {
       const coin = new PIXI.Text({ text: "💰", style: { fontSize: 24 } });
       coin.position.set(startX, startY);
       coin.anchor.set(0.5);
-      
-      // ვიზუალურად ვამატებთ ყველაზე მაღალ შრეზე
+      coin.scale.set(0); 
+
       this.app.stage.addChild(coin);
 
-      const delay = i * 0.1; // რიგ-რიგობით მიფრინავენ
+      const popX = startX + (Math.random() - 0.5) * 120;
+      const popY = startY - 70 - Math.random() * 60;
+      const delay = i * 0.04; 
+
+      let frameCount = 0;
+      const spawnSparkle = () => {
+        frameCount++;
+        if (frameCount % 3 !== 0) return; 
+
+        const sparkle = new PIXI.Graphics();
+        sparkle.beginFill(0xffdd00, 0.8); 
+        sparkle.drawCircle(0, 0, 2); 
+        sparkle.endFill();
+        sparkle.position.set(coin.x, coin.y); 
+        
+        this.app.stage.addChild(sparkle);
+
+        gsap.to(sparkle, {
+          y: sparkle.y + 15,
+          alpha: 0,
+          duration: 0.2, 
+          onComplete: () => { if (!sparkle.destroyed) sparkle.destroy(); }
+        });
+      };
+
       const tl = gsap.timeline({
         delay: delay,
         onComplete: () => {
-          this.app.stage.removeChild(coin);
-          coin.destroy();
-          // როცა ბოლო კოინი მივა, მაშინ ვისვრით ივენთს რომ ფული დაემატოს
+          if (!coin.destroyed) coin.destroy();
+
           if (i === coinCount - 1) {
             globalEvents.emit("add-gold", { id, amount: amountToGive });
+            
+            gsap.fromTo(this.currencyDisplay.scale, 
+              { x: 1.2, y: 1.2 }, 
+              { x: 1, y: 1, duration: 0.3, ease: "back.out(2)" }
+            );
           }
         }
       });
 
-      // კოინი ჯერ ცოტა ზემოთ და გვერდზე ხტება...
-      tl.to(coin.position, {
-        x: startX + (Math.random() - 0.5) * 100,
-        y: startY - 100 - Math.random() * 50,
-        duration: 0.4,
-        ease: "power2.out"
-      });
-
-      // ...და მერე მიფრინავს მიზნისკენ
-      tl.to(coin.position, {
-        x: targetPos.x,
-        y: targetPos.y,
-        duration: 0.6,
-        ease: "back.in(1.5)"
-      });
-      
-      // ფრენის დროს ტრიალებს
-      tl.to(coin, { rotation: Math.PI * 4, duration: 1 }, 0);
-      tl.to(coin.scale, { x: 0.5, y: 0.5, duration: 0.6 }, 0.4);
+      tl.to(coin.scale, { x: 1, y: 1, duration: 0.2, ease: "back.out(2)" }, 0);
+      tl.to(coin.position, { x: popX, y: popY, duration: 0.3, ease: "power2.out" }, 0);
+      tl.to(coin.position, { 
+        x: targetPos.x, y: targetPos.y, duration: 0.45, ease: "power2.in", onUpdate: spawnSparkle 
+      }, 0.3);
+      tl.to(coin, { rotation: Math.PI * 4, duration: 0.75, ease: "none" }, 0);
+      tl.set(coin, { alpha: 0, visible: false, renderable: false }, 0.74); 
     }
   }
 
-  public showWarning(message: string) { /* ... იგივე კოდი ... */ }
-  public showEndScreen(url?: string) { /* ... იგივე კოდი ... */ }
-  public syncWorldItems(dataArray: any[]) { /* ... იგივე კოდი ... */ }
+  public showWarning(message: string) { /* ... */ }
+
+  // === აქ ეკრანის გამოჩენის ლოგიკაა ===
+  public showEndScreen(url?: string) {
+    const { width, height } = this.app.renderer.screen;
+    this.endScreen.show(width, height, url);
+  }
 
   private onResize() {
     requestAnimationFrame(() => {
       const { width, height } = this.app.renderer.screen;
-      
+
       if (this.tutorial) this.tutorial.resize(width, height);
       if (this.shopMenu) this.shopMenu.resize(width, height);
-      if (this.endScreen) this.endScreen.resize(width, height); 
+      if (this.endScreen) this.endScreen.resize(width, height); // <--- ააფდეითებს ზომას ენდ სქრინზეც
 
       if (this.currencyDisplay) {
         const scale = width < 400 ? 0.7 : 1;
         this.currencyDisplay.scale.set(scale);
-        this.currencyDisplay.x = width - 120 * scale; // შევამცირე margin, რადგან border აღარაა
+        this.currencyDisplay.x = width - 120 * scale;
         this.currencyDisplay.y = 20;
       }
       if (this.warningText && this.warningText.visible) {

@@ -17,8 +17,6 @@ import { Environment } from "../world/Environemnt";
 import { ParticleSystem } from "../world/ParticalSystem";
 import { Fence } from "../world/Fance";
 
-type FarmItem = FarmAnimal | Wheat;
-
 export class Experience {
   public events = new EventEmitter();
 
@@ -31,7 +29,7 @@ export class Experience {
   private penManager = new PenManager();
 
   private clock = new THREE.Clock();
-  private farmItems: FarmItem[] = [];
+  public farmItems: FarmAnimal[] = [];
   private farmer: Farmer | null = null;
   private raycaster = new THREE.Raycaster();
 
@@ -120,7 +118,7 @@ export class Experience {
     this.wheat = new Wheat(this.scene, targetPos, 25);
   }
 
-  public spawnFromObjects(objectName: string) {
+  public spawnAnimal(objectName: string) {
     const config = SpawnConfig[objectName] || DefaultConfig;
     const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 

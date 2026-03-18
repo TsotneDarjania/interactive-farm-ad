@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { gsap } from "gsap";
 import { Howl } from "howler";
 import type { SpawnSettings } from "../constants/spawnConfig";
-import { globalEvents } from "../core/EventBus"; // დავამატე EventBus, რომ შევსებისას გამოვიძახოთ
+import { globalEvents } from "../core/EventBus"; 
 import { AnimaProgressFill } from "./animalProgressFill";
 
 const ROAM_CONFIG = {
@@ -33,7 +33,6 @@ export class FarmAnimal {
 
   private debugRing: THREE.Mesh | null = null;
 
-  // დავამატეთ isProducing სტატუსი, რომ ვიცოდეთ მუშაობს თუ არა
   private isProducing: boolean = false;
 
   constructor(
@@ -79,7 +78,6 @@ export class FarmAnimal {
 
     this.anchorPoint = this.wrapper.position.clone();
     
-    // ვქმნით ახალ 3D პროგრეს ბარს ცხოველისთვის (მაგ. 5 წამი შესავსებად)
     this.animaProgressFill = new AnimaProgressFill(id, this.wrapper, 5, reward);
 
     this.animalSound = new Howl({
@@ -96,11 +94,10 @@ export class FarmAnimal {
 
     setTimeout(() => this.startRoaming(), Math.random() * 2000);
     
-    // გამოჩენისთანავე ვიწყებთ პროდუქტის შექმნას (ბარის შევსებას)
     this.startProducing();
+    // აქედან ამოვიღეთ this.pauseWork();
   }
 
-  // --- ახალი მეთოდი ბარის შესავსებად ---
   public startProducing() {
     if (this.isProducing) return;
     this.isProducing = true;
@@ -108,7 +105,6 @@ export class FarmAnimal {
     this.animaProgressFill.startProgress(() => {
         this.isProducing = false;
         
-        // როცა შეივსება, ვისვრით გლობალურ ივენთს EventBus-ით (როგორც Wheat-ში)
         globalEvents.emit("animal-product-ready", {
             id: this.id,
             type: this.type,
@@ -120,10 +116,23 @@ export class FarmAnimal {
     });
   }
 
+  public pauseWork() {
+    this.animaProgressFill.pause();
+  }
+
+  public resumeWork() {
+    this.animaProgressFill.resume();
+  }
+
   private playAnim(name: string, crossfade: number = 0.3) {
     if (!this.mixer || !this.animations.length) return;
 
-    const clip = THREE.AnimationClip.findByName(this.animations, name);
+    let clip = THREE.AnimationClip.findByName(this.animations, name);
+    
+    if (!clip) {
+      clip = this.animations.find(a => a.name.toLowerCase().includes(name.toLowerCase())) || null;
+    }
+
     if (!clip) return;
 
     const next = this.mixer.clipAction(clip);
@@ -213,6 +222,7 @@ export class FarmAnimal {
       onComplete: () => {
         if (this.hopTween) this.hopTween.kill();
         this.wrapper.position.y = this.anchorPoint.y;
+        
         this.playAnim("Idle");
 
         const idleTime =
@@ -236,7 +246,6 @@ export class FarmAnimal {
     });
   }
 
-  // update მეთოდი იღებს კამერას, რომ ბარმა მუდმივად კამერისკენ იყუროს
   public update(delta: number, camera: THREE.Camera) {
     this.mixer?.update(delta);
 

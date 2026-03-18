@@ -131,6 +131,20 @@ export class AnimaProgressFill {
     });
   }
 
+  // === ახალი: პაუზა და გაგრძელება ===
+  public pause() {
+    if (this.tween) {
+      this.tween.pause();
+    }
+  }
+
+  public resume() {
+    if (this.tween && !this.isReady) {
+      this.tween.resume();
+    }
+  }
+  // ===================================
+
   private playTransitionEffect(onCompleteCb?: () => void) {
     const tl = gsap.timeline();
     tl.to(this.barContainer.scale, { x: 1.3, y: 1.3, duration: 0.15, ease: "power2.out" })

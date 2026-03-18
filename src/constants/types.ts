@@ -12,10 +12,10 @@ export type ObjectType = (typeof ObjectType)[keyof typeof ObjectType];
 
 // 2. მხოლოდ შოპის მენიუს აითემები (აქ ხორბალი არ წერია, შესაბამისად შოპში არ გამოჩნდება!)
 export const UI_ITEMS = [
-  { id: ObjectType.CHICKEN, icon: "🐔", price: 50, reward: 25 },
-  { id: ObjectType.PIG, icon: "🐷", price: 80, reward: 50 },
-  { id: ObjectType.SHEEP, icon: "🐑", price: 150, reward: 80 },
-  { id: ObjectType.COW, icon: "🐮", price: 250, reward: 150 },
+  { id: ObjectType.CHICKEN, icon: "🐔", price: 20, reward: 50 },
+  { id: ObjectType.PIG, icon: "🐷", price: 100, reward: 100 },
+  { id: ObjectType.SHEEP, icon: "🐑", price: 150, reward: 200 },
+  { id: ObjectType.COW, icon: "🐮", price: 200, reward: 300 },
 ] as const;
 
 // 3. სამყაროს რესურსები (რასაც ვერ იყიდი, მაგრამ თამაშში არსებობს და ფულს გაძლევს)

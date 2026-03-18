@@ -4,26 +4,34 @@ import { Howl } from "howler";
 import { globalEvents } from "./EventBus";
 import type { UI } from "./UI";
 import { EconomyManager } from "./EconomyManager";
-// import { TutorialManager } from "./TutorialManager";
 import { TutorialState } from "../constants/tutorialSteps";
+
+// ინტერფეისი ობიექტებისთვის, რომლებსაც აქვთ მუშაობის ციკლი
+interface WorkableItem {
+  pauseWork?: () => void;
+  resumeWork?: () => void;
+}
+
+type PlayerPosition = "default" | "wheat" | "fence";
 
 export class GameLogic {
   private experience: Experience;
   private ui: UI;
   private economyManager: EconomyManager;
-  // private tutorialManager: TutorialManager;
 
   private isGameOver = false;
+  private isInitialized = false; 
   private coinSound: Howl;
   private processingIds = new Set<string>();
+  private playerIsOnPoint: PlayerPosition = "default";
 
-  private playerIsOnPoint: "default" | "wheat" | "fence" = "default";
+  // === ახალი ცვლადი ცხოველების დასათვლელად ===
+  private purchasedAnimalsCount = 0;
 
   constructor(experience: Experience, ui: UI) {
     this.experience = experience;
     this.ui = ui;
     this.economyManager = new EconomyManager(this.ui);
-    // this.tutorialManager = new TutorialManager(this.ui, this.experience);
 
     this.coinSound = new Howl({
       src: ["sounds/coin.wav", "sounds/coin.mp3"],
@@ -35,76 +43,81 @@ export class GameLogic {
   }
 
   private init() {
-    // 1. თამაში დაიწყო
     globalEvents.on("intro-complete", () => {
-      // this.tutorialManager.handleEvent("START");
+      this.isInitialized = true;
       this.ui.showMenu();
     });
 
     globalEvents.on("wheat-clicked", async () => {
+      if (!this.isInitialized || this.isGameOver) return; // თამაში თუ მორჩა, ვბლოკავთ
+
       await this.experience.focusOnObject(ObjectType.WHEAT);
       this.playerIsOnPoint = "wheat";
       this.experience.startWheatWorking();
+      this.toggleAllAnimalsWork(false);
     });
 
     globalEvents.on("fance-clicked", async () => {
+      if (!this.isInitialized || this.isGameOver) return;
+
       await this.experience.focusOnObject(ObjectType.FENCE);
       this.playerIsOnPoint = "fence";
       this.experience.stopWheatScytheWorking();
+      this.toggleAllAnimalsWork(true);
     });
 
-    // === ცხოველის კოინის აღების ივენთი (აღდგენილი და გამართული) ===
     globalEvents.on("animal-coin-collected", (data: { reward: number; x: number; y: number; id: string }) => {
-      // ვაფრენთ კოინებს PIXI-ში იმ წერტილიდან, სადაც 3D-ში კოინი იყო
-      this.ui.spawnFlyingCoins(
-        data.x,
-        data.y,
-        data.reward,
-        data.id
-      );
+      if (!this.isInitialized || this.isGameOver) return;
+      this.ui.spawnFlyingCoins(data.x, data.y, data.reward, data.id);
     });
 
     globalEvents.on("wheat-step-completed", (data: any) => {
-      // ვიღებთ კამერას და ეკრანის ზომებს 2D პოზიციის გამოსათვლელად
-      const camera = this.experience.camera;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      if (!this.isInitialized || this.isGameOver) return;
+      this.handleWheatReward(data);
+    });
 
-      // ვიძახებთ ProgressFill-ის get2DPosition ფუნქციას
-      const screenPos = data.sourceEntity.progressFill.get2DPosition(
-        camera,
-        width,
-        height
-      );
+    globalEvents.on("add-gold", (data: { id: string; amount: number }) => {
+      if (!this.isInitialized || this.isGameOver) return;
+      this.processGoldGain(data.id, data.amount);
+    });
 
-      if (screenPos) {
-        // ვაფრენთ კოინებს PIXI.js-ში
-        this.ui.spawnFlyingCoins(
-          screenPos.x,
-          screenPos.y,
-          data.reward,
-          data.id
-        );
+    globalEvents.on("try-purchase", (id: string) => {
+      if (!this.isInitialized || this.isGameOver) return;
+      this.handlePurchase(id);
+    });
+  }
+
+  private handleWheatReward(data: any) {
+    const { camera } = this.experience;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const screenPos = data.sourceEntity?.progressFill?.get2DPosition(camera, width, height);
+
+    if (screenPos) {
+      this.ui.spawnFlyingCoins(screenPos.x, screenPos.y, data.reward, data.id);
+    } else {
+      globalEvents.emit("add-gold", { id: data.id, amount: data.reward });
+    }
+  }
+
+  private processGoldGain(id: string, amount: number) {
+    if (this.processingIds.has(id)) return;
+    
+    this.processingIds.add(id);
+    this.economyManager.addGold(amount);
+    this.coinSound.play();
+    
+    setTimeout(() => this.processingIds.delete(id), 500);
+  }
+
+  private toggleAllAnimalsWork(shouldWork: boolean) {
+    this.experience.farmItems.forEach((item: WorkableItem) => {
+      if (shouldWork) {
+        item.resumeWork?.();
       } else {
-        // თუ კადრში არაა, პირდაპირ ვრიცხავთ
-        globalEvents.emit("add-gold", { id: data.id, amount: data.reward });
+        item.pauseWork?.();
       }
-    });
-
-    globalEvents.on("sync-world-ui", (uiData) => {
-      uiData.forEach((item: any) => {
-        if (item.progress >= 1 && !this.processingIds.has(item.id)) {
-          this.processingIds.add(item.id);
-          this.ui.setTutorialTarget(null);
-        }
-      });
-      this.ui.syncWorldItems(uiData);
-    });
-
-
-
-    globalEvents.on("try-purchase", async (id: string) => {
-      await this.handlePurchase(id);
     });
   }
 
@@ -112,25 +125,29 @@ export class GameLogic {
     if (this.isGameOver) return;
 
     const itemData = UI_ITEMS.find((i) => i.id === id);
-    if (!itemData) return;
+    if (!itemData || !this.economyManager.spendGold(itemData.price)) return;
 
-    if (!this.economyManager.spendGold(itemData.price)) {
-      this.ui.showWarning("Not enough money!");
-      return;
-    }
-
-    this.experience.spawnFromObjects(id);
+    this.experience.spawnAnimal(id);
     this.experience.fence.showWaypoint();
 
-    // 3. ნივთი იყიდა (ვატყობინებთ ტუტორიალს)
-    // await this.tutorialManager.handleEvent("ITEM_BOUGHT", id);
+    if (this.playerIsOnPoint !== "fence") {
+      const lastIndex = this.experience.farmItems.length - 1;
+      const newAnimal = this.experience.farmItems[lastIndex] as WorkableItem;
+      newAnimal?.pauseWork?.();
+    }
 
-    // თამაშის დასრულების ლოგიკა
-    // if (this.tutorialManager.getState() === TutorialState.COMPLETED && id !== ObjectType.FENCE) {
-    //   this.isGameOver = true;
-    //   setTimeout(() => {
-    //     this.ui.showEndScreen("https://github.com/TsotneDarjania");
-    //   }, 3000);
-    // }
+    // === ენდ სქრინის ტრიგერი მე-5 ყიდვისას ===
+    this.purchasedAnimalsCount++;
+    
+    if (this.purchasedAnimalsCount >= 5) {
+      this.isGameOver = true;
+      
+      // 1.5 წამით ვაყოვნებთ, რომ მოთამაშემ დაინახოს ნაყიდი ცხოველი სანამ რეკლამა ამოხტება
+      setTimeout(() => {
+        this.ui.showEndScreen("https://github.com/TsotneDarjania");
+        this.toggleAllAnimalsWork(false); // თამაშის დასრულებისას ყველაფერი გავაჩეროთ
+        this.experience.stopWheatScytheWorking();
+      }, 1500);
+    }
   }
 }

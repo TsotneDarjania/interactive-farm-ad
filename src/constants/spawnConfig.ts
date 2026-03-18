@@ -65,6 +65,38 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
       gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
     },
   },
+  [ObjectType.PIG]: {
+    scale: 1.5,
+    position: new THREE.Vector3(-10, 4.8, 0), 
+    farmerStandPoint: new THREE.Vector3(-1.5, 0, -2.5),
+    farmerRotation: 0,
+    cameraPos: new THREE.Vector3(20, 25, 10), // შენი ორიგინალი
+    cameraTarget: new THREE.Vector3(0, 5, 0), // შენი ორიგინალი
+    animation: (wrapper) => {
+      wrapper.scale.set(0, 0, 0);
+      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
+    },
+  },
+  [ObjectType.SHEEP]: {
+    scale: 1.5,
+    position: new THREE.Vector3(-10, 4.8, 0), 
+    farmerStandPoint: new THREE.Vector3(-1.5, 0, -2.5),
+    farmerRotation: 0,
+    cameraPos: new THREE.Vector3(20, 25, 10), // შენი ორიგინალი
+    cameraTarget: new THREE.Vector3(0, 5, 0), // შენი ორიგინალი
+    animation: (wrapper) => {
+      wrapper.scale.set(0, 0, 0);
+      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
+    },
+  },
+  [ObjectType.COW]: {
+    scale: 4,
+    position: new THREE.Vector3(-10, 5.2, 0), 
+    animation: (wrapper) => {
+      wrapper.scale.set(0, 0, 0);
+      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
+    },
+  },
 };
 
 export const DefaultConfig: SpawnSettings = {
