@@ -1,11 +1,15 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
-import { assetCache } from "../core/ModelLoader"; // <--- შემოვიტანეთ გლობალური ქეში
+import { assetCache } from "../core/ModelLoader";
 
 export class Waypoint {
   public mesh: THREE.Group;
   private scene: THREE.Scene;
   private glowGroup: THREE.Group;
+  private hitbox!: THREE.Mesh;
+  
+  // ამ Callback-ს სხვა კლასები გამოიყენებენ (მაგ: Wheat)
+  public onClick?: () => void;
 
   constructor(scene: THREE.Scene, position: THREE.Vector3) {
     this.scene = scene;
@@ -16,25 +20,43 @@ export class Waypoint {
     this.glowGroup = new THREE.Group();
     this.mesh.add(this.glowGroup);
 
-    // 1. ვქმნით ნეონის წრეებს
     this.createNeonEffect();
-    
-    // 2. ვტვირთავთ 3D მოდელს ლოუდერიდან
     this.attach3DModel();
+    this.createLargeHitbox();
 
-    // 3. საწყისად ვმალავთ
     this.hide(); 
   }
 
- private attach3DModel() {
+  private createLargeHitbox() {
+    const geometry = new THREE.SphereGeometry(4, 12, 12);
+    const material = new THREE.MeshBasicMaterial({ 
+      transparent: true, 
+      opacity: 0, 
+      depthWrite: false 
+    });
+    this.hitbox = new THREE.Mesh(geometry, material);
+    
+    // ვაბამთ parentEntity-ს Experience-ის Raycaster-ისთვის
+    this.hitbox.userData.parentEntity = this; 
+    
+    this.mesh.add(this.hitbox);
+  }
+
+  // როცა Experience-ში დააჭერენ hitbox-ს, ეს მეთოდი გაეშვება
+  public handleInteraction() {
+    console.log("✅ Waypoint-ს დაეჭირა!");
+    // თუ ვინმემ (მაგ. Wheat) დაგვიყენა onClick ფუნქცია, გავუშვათ
+    if (this.onClick) {
+      this.onClick();
+    }
+  }
+
+  private attach3DModel() {
     try {
       const { scene: model } = assetCache.getModel("waypoint");
       
-      // 1. ზომა დავტოვოთ შესამჩნევი (მაგალითად 15)
       const scale = 4; 
       model.scale.set(scale, scale, scale);
-      
-      // ოდნავ ავწიოთ ზემოთ მოდელი ჯგუფის შიგნით, რომ წრეებს არ ეჯახებოდეს
       model.position.y = 0; 
       
       this.mesh.add(model);
@@ -44,19 +66,18 @@ export class Waypoint {
           const m = c as THREE.Mesh;
           m.castShadow = true;
           
-          // 2. დავუბრუნოთ ორიგინალი მატერიალები, მაგრამ DepthTest გამოვურთოთ,
-          // რომ მიწამ არ დაფაროს (Z-fighting-ის პრევენცია)
+          m.userData.parentEntity = this; 
+
           const materials = Array.isArray(m.material) ? m.material : [m.material];
           materials.forEach(mat => {
-            mat.depthTest = true; // დავუბრუნოთ სტანდარტულს
+            mat.depthTest = true;
             if ('transparent' in mat) {
               mat.transparent = true;
-              mat.opacity = 1; // ბოლომდე გამოვაჩინოთ
+              mat.opacity = 1;
             }
           });
         }
       });
-
     } catch (e) {
       console.error("❌ შეცდომა Waypoint-ზე:", e);
     }
@@ -87,7 +108,6 @@ export class Waypoint {
 
   public show() {
     this.mesh.visible = true;
-    console.log("✅ Waypoint გამოიძახა show()!"); // ტესტისთვის დავამატე, რომ კონსოლში გამოჩნდეს
   }
 
   public hide() {

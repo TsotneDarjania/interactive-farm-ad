@@ -26,8 +26,10 @@ export class Fence {
     const waypointPos = this.position.clone().add(waypointOffset);
     this.waypoint = new Waypoint(this.scene, waypointPos);
 
-    // მივაბათ პატრონი Experience-ის რეიკასტერისთვის
-    this.waypoint.mesh.userData.parentEntity = this;
+    // !!! შეცვლილია: ვაკავშირებთ Waypoint-ის კლიკს ღობის კლიკთან !!!
+    this.waypoint.onClick = () => {
+      this.handleInteraction();
+    };
 
     // 2. მოდელის აწყობა
     this.setupModel();
@@ -50,11 +52,14 @@ export class Fence {
 
     this.mesh.add(model);
 
-    // ჩრდილები
+    // ჩრდილები და Raycaster-ისთვის parentEntity-ის მიბმა
     model.traverse((c) => {
       if ((c as THREE.Mesh).isMesh) {
         c.castShadow = true;
         c.receiveShadow = true;
+        
+        // !!! დამატებულია: ღობეზე პირდაპირ დაჭერამაც რომ იმუშაოს !!!
+        c.userData.parentEntity = this; 
       }
     });
 

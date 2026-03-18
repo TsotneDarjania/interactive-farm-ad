@@ -8,11 +8,11 @@ export interface SpawnSettings {
   position?: THREE.Vector3; 
   animation: (wrapper: THREE.Group) => void;
   
-  // 2. ფერმერის პარამეტრები (სად მივიდეს და საით გაიხედოს)
+  // 2. ფერმერის პარამეტრები 
   farmerStandPoint?: THREE.Vector3; 
   farmerRotation?: number; 
 
-  // 3. კამერის პარამეტრები (საიდან უყუროს ამ ობიექტს)
+  // 3. კამერის პარამეტრები (ნარჩუნდება ორიგინალი სახელები)
   cameraPos?: THREE.Vector3;
   cameraTarget?: THREE.Vector3;
 }
@@ -23,8 +23,17 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
     position: new THREE.Vector3(10.7, 4, -6.5),
     farmerStandPoint: new THREE.Vector3(10.3, 3, -2.5),
     farmerRotation: 0, 
-    cameraPos: new THREE.Vector3(30, 20, -10), // შენი ორიგინალი
-    cameraTarget: new THREE.Vector3(0, 0, 0),  // შენი ორიგინალი
+    // === აქ იწერება ორივე ვარიანტი ===
+    get cameraPos() { 
+      return window.innerWidth < 768 
+        ? new THREE.Vector3(18, 15, -7)  // მობილურის ვექტორი
+        : new THREE.Vector3(30, 20, -10); // დესკტოპის ვექტორი (ორიგინალი)
+    },
+    get cameraTarget() { 
+      return window.innerWidth < 768 
+        ? new THREE.Vector3(0, 0, 0) // მობილურის სამიზნე
+        : new THREE.Vector3(0, 0, 0);  // დესკტოპის სამიზნე
+    },
     animation: (wrapper) => {
       const targetY = wrapper.position.y;
       wrapper.scale.set(0, 0, 0);
@@ -43,23 +52,27 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
     position: new THREE.Vector3(-10, 5, 0), 
     farmerStandPoint: new THREE.Vector3(-4.2, 0, 1),
     farmerRotation: -Math.PI / 2, 
-    cameraPos: new THREE.Vector3(-17, 19, -15), // შენი ორიგინალი
-    cameraTarget: new THREE.Vector3(-7, 5, 0), // შენი ორიგინალი
+    get cameraPos() { 
+      return window.innerWidth < 768 
+        ? new THREE.Vector3(-10, 16, -5) 
+        : new THREE.Vector3(-17, 19, -15); 
+    },
+    get cameraTarget() { 
+      return window.innerWidth < 768 
+        ? new THREE.Vector3(-7, 5, 0) 
+        : new THREE.Vector3(-7, 5, 0); 
+    },
     animation: (wrapper) => {
       const targetY = wrapper.position.y;
-      wrapper.position.y += 5;
-      gsap.to(wrapper.position, { y: targetY, duration: 0.8, ease: "bounce.out" });
+      wrapper.position.y += 1;
+      gsap.to(wrapper.position, { y: targetY, duration: 0.1, ease: "bounce.out" });
       wrapper.scale.set(0, 0, 0);
-      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.4 });
+      gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.1 });
     },
   },
   [ObjectType.CHICKEN]: {
     scale: 1.2,
     position: new THREE.Vector3(-10, 4.8, 0), 
-    farmerStandPoint: new THREE.Vector3(-1.5, 0, -2.5),
-    farmerRotation: 0,
-    cameraPos: new THREE.Vector3(20, 25, 10), // შენი ორიგინალი
-    cameraTarget: new THREE.Vector3(0, 5, 0), // შენი ორიგინალი
     animation: (wrapper) => {
       wrapper.scale.set(0, 0, 0);
       gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
@@ -68,10 +81,6 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
   [ObjectType.PIG]: {
     scale: 1.5,
     position: new THREE.Vector3(-10, 4.8, 0), 
-    farmerStandPoint: new THREE.Vector3(-1.5, 0, -2.5),
-    farmerRotation: 0,
-    cameraPos: new THREE.Vector3(20, 25, 10), // შენი ორიგინალი
-    cameraTarget: new THREE.Vector3(0, 5, 0), // შენი ორიგინალი
     animation: (wrapper) => {
       wrapper.scale.set(0, 0, 0);
       gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
@@ -79,11 +88,7 @@ export const SpawnConfig: Record<string, SpawnSettings> = {
   },
   [ObjectType.SHEEP]: {
     scale: 1.5,
-    position: new THREE.Vector3(-10, 4.8, 0), 
-    farmerStandPoint: new THREE.Vector3(-1.5, 0, -2.5),
-    farmerRotation: 0,
-    cameraPos: new THREE.Vector3(20, 25, 10), // შენი ორიგინალი
-    cameraTarget: new THREE.Vector3(0, 5, 0), // შენი ორიგინალი
+    position: new THREE.Vector3(-10, 4.6, 0), 
     animation: (wrapper) => {
       wrapper.scale.set(0, 0, 0);
       gsap.to(wrapper.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });

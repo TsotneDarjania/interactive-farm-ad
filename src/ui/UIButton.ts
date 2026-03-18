@@ -31,7 +31,6 @@ export class UIButton extends PIXI.Container {
       this.alpha = 0.5;
       
       gsap.killTweensOf(this.content.scale);
-      gsap.killTweensOf(this.bg);
       this.content.scale.set(1);
       this.bg.tint = 0xffffff;
     } else {
@@ -87,12 +86,14 @@ export class UIButton extends PIXI.Container {
     );
     this.on("pointerdown", () => {
       gsap.to(this.content.scale, { x: 0.9, y: 0.9, duration: 0.1 });
-      gsap.to(this.bg, { tint: 0xeeeeee, duration: 0.1 });
+      // GSAP-ის მაგივრად, პირდაპირ ვანიჭებთ ფერს 
+      this.bg.tint = 0xeeeeee; 
     });
 
     const resetState = () => {
       gsap.to(this.content.scale, { x: 1, y: 1, duration: 0.1 }); 
-      gsap.to(this.bg, { tint: 0xffffff, duration: 0.1 });
+      // ვაბრუნებთ ორიგინალ ფერს მომენტალურად
+      this.bg.tint = 0xffffff;
     };
 
     this.on("pointerup", resetState);

@@ -30,25 +30,25 @@ export class Wheat {
     this.reward = rewardAmount;
     this.id = "wheat_harvest";
 
-    // 1. ვქმნით ძირითად ჯგუფს
     this.mesh = new THREE.Group();
     this.mesh.position.copy(this.position);
     this.scene.add(this.mesh);
 
-    // 2. UI პროგრესის ბარი (3D-ში)
     this.progressFill = new ProgressFill(this.id, this.mesh);
 
-    // 3. ვეიპოინტი (ისარი და ნეონები)
     const waypointOffset = new THREE.Vector3(0, 0.3, 4);
     const waypointPos = this.position.clone().add(waypointOffset);
     this.waypoint = new Waypoint(this.scene, waypointPos);
 
-    this.waypoint.mesh.userData.parentEntity = this;
+    // !!! მთავარი კავშირი - ვასწავლით Waypoint-ს რა ქნას დაჭერისას !!!
+    this.waypoint.onClick = () => {
+      this.handleInteraction();
+    };
 
-    // 4. მოდელების აწყობა და ვიზუალიზაცია
+    // ხორბალზე დაჭერაც რომ მუშაობდეს
+    this.mesh.userData.parentEntity = this;
+
     this.setupModel();
-
-    // საწყისად ვაჩენთ ვეიპოინტს (ტუტორიალისთვის)
     this.showWaypoint();
   }
 
@@ -56,19 +56,15 @@ export class Wheat {
     const config = SpawnConfig["wheat"] || DefaultConfig;
     const { scene: wheatModel } = assetCache.getModel("wheat");
 
-    // მოდელის ზომის ავტომატური გასწორება კონფიგის მიხედვით
     const box = new THREE.Box3().setFromObject(wheatModel);
     const size = box.getSize(new THREE.Vector3());
-    const finalScale =
-      (config.scale || 1) / (Math.max(size.x, size.y, size.z) || 1);
+    const finalScale = (config.scale || 1) / (Math.max(size.x, size.y, size.z) || 1);
 
     wheatModel.scale.setScalar(finalScale);
     wheatModel.position.y = -box.getCenter(new THREE.Vector3()).y * finalScale;
 
-    // ვქმნით ხორბლის ნაკვეთს
     this.generatePatch(wheatModel);
 
-    // თუ კონფიგში გვაქვს სპავნ-ანიმაცია (მაგ. Scale Up), ვუშვებთ მას
     if (config.animation) {
       config.animation(this.mesh);
     }
@@ -91,6 +87,13 @@ export class Wheat {
         stalk.position.set(x, 0, z);
         stalk.rotation.y = Math.random() * Math.PI;
         stalk.scale.multiplyScalar(0.8 + Math.random() * 0.4);
+
+        // თითოეულ ღეროსაც ვაბამთ, რომ მასზე დაჭერამაც იმუშაოს
+        stalk.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+             child.userData.parentEntity = this;
+          }
+        });
 
         this.mesh.add(stalk);
         this.applySwayAnimation(stalk);
@@ -126,7 +129,6 @@ export class Wheat {
     if (this.isHarvesting) return;
     this.isHarvesting = true;
 
-    // თუ სერპი (Scythe) ჯერ არ შექმნილა
     if (!this.scytheSprite) {
       const map = assetCache.getTexture("scythe");
       this.scytheSprite = new THREE.Sprite(
@@ -139,7 +141,6 @@ export class Wheat {
 
     this.scytheSprite.visible = true;
 
-    // სერპის ქანაობის ანიმაცია
     if (!this.scytheTween) {
       this.scytheTween = gsap.to(this.scytheSprite.material, {
         rotation: -0.6,
@@ -152,12 +153,8 @@ export class Wheat {
       this.scytheTween.restart();
     }
 
-    // პროგრესის დაწყება
     if (this.progressFill) {
       this.progressFill.startProgress(() => {
-        console.log("✅ ხორბლის ერთი სამუშაო სტეპი დასრულდა!");
-
-        // ვისვრით ივენთს გეიმ-ლოგიკისთვის (დამატებულია sourceEntity)
         globalEvents.emit("wheat-step-completed", {
           id: this.id,
           reward: this.reward,
@@ -165,10 +162,8 @@ export class Wheat {
           sourceEntity: this 
         });
 
-        // ვხსნით ბლოკს!
         this.isHarvesting = false;
 
-        // ვაძლევთ 350 მილიწამს ანიმაციის დასასრულებლად და ვუშვებთ ახალ ციკლს
         this.loopTimeout = setTimeout(() => {
           this.startWorkingProcess();
         }, 350);
@@ -179,7 +174,6 @@ export class Wheat {
   public stopWorking() {
     this.isHarvesting = false;
     
-    // ვაუქმებთ ავტომატურ გამეორებას, თუ მოთამაშემ მუშაობა შეწყვიტა
     if (this.loopTimeout) {
       clearTimeout(this.loopTimeout);
       this.loopTimeout = null;

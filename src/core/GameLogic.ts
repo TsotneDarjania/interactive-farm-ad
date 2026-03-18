@@ -20,7 +20,7 @@ export class GameLogic {
   private economyManager: EconomyManager;
 
   private isGameOver = false;
-  private isInitialized = false; 
+  private isInitialized = false;
   private coinSound: Howl;
   private processingIds = new Set<string>();
   private playerIsOnPoint: PlayerPosition = "default";
@@ -49,7 +49,8 @@ export class GameLogic {
     });
 
     globalEvents.on("wheat-clicked", async () => {
-      if (!this.isInitialized || this.isGameOver) return; // თამაში თუ მორჩა, ვბლოკავთ
+      if (!this.isInitialized || this.isGameOver) return;
+      this.experience.hideArrow();
 
       await this.experience.focusOnObject(ObjectType.WHEAT);
       this.playerIsOnPoint = "wheat";
@@ -66,10 +67,14 @@ export class GameLogic {
       this.toggleAllAnimalsWork(true);
     });
 
-    globalEvents.on("animal-coin-collected", (data: { reward: number; x: number; y: number; id: string }) => {
-      if (!this.isInitialized || this.isGameOver) return;
-      this.ui.spawnFlyingCoins(data.x, data.y, data.reward, data.id);
-    });
+    globalEvents.on(
+      "animal-coin-collected",
+      (data: { reward: number; x: number; y: number; id: string }) => {
+        if (!this.isInitialized || this.isGameOver) return;
+          this.coinSound.play();
+        this.ui.spawnFlyingCoins(data.x, data.y, data.reward, data.id);
+      },
+    );
 
     globalEvents.on("wheat-step-completed", (data: any) => {
       if (!this.isInitialized || this.isGameOver) return;
@@ -92,9 +97,14 @@ export class GameLogic {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    const screenPos = data.sourceEntity?.progressFill?.get2DPosition(camera, width, height);
+    const screenPos = data.sourceEntity?.progressFill?.get2DPosition(
+      camera,
+      width,
+      height,
+    );
 
     if (screenPos) {
+      this.coinSound.play();
       this.ui.spawnFlyingCoins(screenPos.x, screenPos.y, data.reward, data.id);
     } else {
       globalEvents.emit("add-gold", { id: data.id, amount: data.reward });
@@ -103,11 +113,10 @@ export class GameLogic {
 
   private processGoldGain(id: string, amount: number) {
     if (this.processingIds.has(id)) return;
-    
+
     this.processingIds.add(id);
     this.economyManager.addGold(amount);
-    this.coinSound.play();
-    
+
     setTimeout(() => this.processingIds.delete(id), 500);
   }
 
@@ -138,10 +147,10 @@ export class GameLogic {
 
     // === ენდ სქრინის ტრიგერი მე-5 ყიდვისას ===
     this.purchasedAnimalsCount++;
-    
-    if (this.purchasedAnimalsCount >= 5) {
+
+    if (this.purchasedAnimalsCount >= 8) {
       this.isGameOver = true;
-      
+
       // 1.5 წამით ვაყოვნებთ, რომ მოთამაშემ დაინახოს ნაყიდი ცხოველი სანამ რეკლამა ამოხტება
       setTimeout(() => {
         this.ui.showEndScreen("https://github.com/TsotneDarjania");
