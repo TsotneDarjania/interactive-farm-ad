@@ -50,7 +50,18 @@ export class GameLogic {
     globalEvents.on("fance-clicked", async () => {
       await this.experience.focusOnObject(ObjectType.FENCE);
       this.playerIsOnPoint = "fence";
-      this.experience.stopWheatScytheWorking()
+      this.experience.stopWheatScytheWorking();
+    });
+
+    // === ცხოველის კოინის აღების ივენთი (აღდგენილი და გამართული) ===
+    globalEvents.on("animal-coin-collected", (data: { reward: number; x: number; y: number; id: string }) => {
+      // ვაფრენთ კოინებს PIXI-ში იმ წერტილიდან, სადაც 3D-ში კოინი იყო
+      this.ui.spawnFlyingCoins(
+        data.x,
+        data.y,
+        data.reward,
+        data.id
+      );
     });
 
     globalEvents.on("wheat-step-completed", (data: any) => {
@@ -63,7 +74,7 @@ export class GameLogic {
       const screenPos = data.sourceEntity.progressFill.get2DPosition(
         camera,
         width,
-        height,
+        height
       );
 
       if (screenPos) {
@@ -72,7 +83,7 @@ export class GameLogic {
           screenPos.x,
           screenPos.y,
           data.reward,
-          data.id,
+          data.id
         );
       } else {
         // თუ კადრში არაა, პირდაპირ ვრიცხავთ
@@ -84,23 +95,13 @@ export class GameLogic {
       uiData.forEach((item: any) => {
         if (item.progress >= 1 && !this.processingIds.has(item.id)) {
           this.processingIds.add(item.id);
-
-          // this.experience.resetWheatHarvest();
           this.ui.setTutorialTarget(null);
         }
       });
       this.ui.syncWorldItems(uiData);
     });
 
-    globalEvents.on("add-gold", (data: { id: string; amount: number }) => {
-      this.economyManager.addGold(data.amount);
 
-      this.coinSound.play();
-      setTimeout(() => this.processingIds.delete(data.id), 500);
-
-      // 2. ფული აიღო
-      // this.tutorialManager.handleEvent("GOLD_COLLECTED");
-    });
 
     globalEvents.on("try-purchase", async (id: string) => {
       await this.handlePurchase(id);
@@ -124,7 +125,7 @@ export class GameLogic {
     // 3. ნივთი იყიდა (ვატყობინებთ ტუტორიალს)
     // await this.tutorialManager.handleEvent("ITEM_BOUGHT", id);
 
-    // თამაშის დასრულების ლოგიკა (თუ უკვე მორჩა ტუტორიალს და სხვა რამე იყიდა)
+    // თამაშის დასრულების ლოგიკა
     // if (this.tutorialManager.getState() === TutorialState.COMPLETED && id !== ObjectType.FENCE) {
     //   this.isGameOver = true;
     //   setTimeout(() => {

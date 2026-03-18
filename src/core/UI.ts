@@ -147,6 +147,7 @@ export class UI {
 
   // === ახალი: კოინების გაფრენის ანიმაცია ===
   public spawnFlyingCoins(startX: number, startY: number, amountToGive: number, id: string) {
+    console.log(amountToGive)
     const coinCount = Math.min(Math.max(Math.floor(amountToGive / 5), 3), 10); // 3-დან 10 კოინამდე
     const targetPos = { x: this.currencyDisplay.x + 20, y: this.currencyDisplay.y + 15 };
 

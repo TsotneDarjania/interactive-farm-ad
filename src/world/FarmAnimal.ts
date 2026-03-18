@@ -1,24 +1,24 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
-import { ProgressFill } from "./ProgressFill";
 import { Howl } from "howler";
 import type { SpawnSettings } from "../constants/spawnConfig";
+import { globalEvents } from "../core/EventBus"; // დავამატე EventBus, რომ შევსებისას გამოვიძახოთ
+import { AnimaProgressFill } from "./animalProgressFill";
 
-// როუმინგის კონფიგი - აქ შეცვალე რაც გინდა
 const ROAM_CONFIG = {
-  radius: 3.0,          // არეალის რადიუსი
-  speed: 2,           // სიარულის სიჩქარე
-  minIdle: 1000,        // მინ. დასვენება (ms)
-  maxIdle: 4000,        // მაქს. დასვენება (ms)
-  hopHeight: 0.3,       // chicken-ის ხტომის სიმაღლე
-  hopDuration: 0.3,     // ხტომის დრო
+  radius: 3.0,          
+  speed: 2,             
+  minIdle: 1000,        
+  maxIdle: 4000,        
+  hopHeight: 0.3,       
+  hopDuration: 0.3,     
 };
 
 export class FarmAnimal {
   public id: string;
   public type: string;
   public wrapper: THREE.Group;
-  public progressFill: ProgressFill;
+  public animaProgressFill: AnimaProgressFill;
   public reward: number;
 
   private anchorPoint: THREE.Vector3;
@@ -31,8 +31,10 @@ export class FarmAnimal {
   private currentAction: THREE.AnimationAction | null = null;
   private animations: THREE.AnimationClip[] = [];
 
-  // debug helpers
   private debugRing: THREE.Mesh | null = null;
+
+  // დავამატეთ isProducing სტატუსი, რომ ვიცოდეთ მუშაობს თუ არა
+  private isProducing: boolean = false;
 
   constructor(
     id: string,
@@ -76,7 +78,9 @@ export class FarmAnimal {
     }
 
     this.anchorPoint = this.wrapper.position.clone();
-    this.progressFill = new ProgressFill(id, this.wrapper);
+    
+    // ვქმნით ახალ 3D პროგრეს ბარს ცხოველისთვის (მაგ. 5 წამი შესავსებად)
+    this.animaProgressFill = new AnimaProgressFill(id, this.wrapper, 5, reward);
 
     this.animalSound = new Howl({
       src: [`sounds/${this.type}.wav`, `sounds/${this.type}.mp3`],
@@ -91,6 +95,29 @@ export class FarmAnimal {
     this.playSound();
 
     setTimeout(() => this.startRoaming(), Math.random() * 2000);
+    
+    // გამოჩენისთანავე ვიწყებთ პროდუქტის შექმნას (ბარის შევსებას)
+    this.startProducing();
+  }
+
+  // --- ახალი მეთოდი ბარის შესავსებად ---
+  public startProducing() {
+    if (this.isProducing) return;
+    this.isProducing = true;
+
+    this.animaProgressFill.startProgress(() => {
+        this.isProducing = false;
+        
+        // როცა შეივსება, ვისვრით გლობალურ ივენთს EventBus-ით (როგორც Wheat-ში)
+        globalEvents.emit("animal-product-ready", {
+            id: this.id,
+            type: this.type,
+            reward: this.reward,
+            sourceEntity: this
+        });
+        
+        console.log(`[${this.type}]-ის პროდუქტი მზადაა!`);
+    });
   }
 
   private playAnim(name: string, crossfade: number = 0.3) {
@@ -120,7 +147,6 @@ export class FarmAnimal {
   }
 
   private getRandomPointInSquare(): { x: number; z: number } {
-    // მართკუთხედში რანდომ წერტილი (წრე კი არა)
     const r = ROAM_CONFIG.radius;
     const x = this.anchorPoint.x + (Math.random() * 2 - 1) * r;
     const z = this.anchorPoint.z + (Math.random() * 2 - 1) * r;
@@ -131,7 +157,6 @@ export class FarmAnimal {
     if (this.debugRing || !this.wrapper.parent) return;
 
     const r = ROAM_CONFIG.radius;
-    // მართკუთხედის კონტური
     const points = [
       new THREE.Vector3(-r, 0, -r),
       new THREE.Vector3(r, 0, -r),
@@ -157,21 +182,6 @@ export class FarmAnimal {
     const dx = targetX - this.wrapper.position.x;
     const dz = targetZ - this.wrapper.position.z;
     const targetAngle = Math.atan2(dx, dz);
-
-    // DEBUG: სამიზნე წერტილი
-    if (this.wrapper.parent) {
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.06),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 }),
-      );
-      dot.position.set(targetX, 0.1, targetZ);
-      this.wrapper.parent.add(dot);
-      setTimeout(() => this.wrapper.parent?.remove(dot), 5000);
-    }
-
-    console.log(
-      `[${this.type}] → (${targetX.toFixed(2)}, ${targetZ.toFixed(2)}) | anchor: (${this.anchorPoint.x.toFixed(2)}, ${this.anchorPoint.z.toFixed(2)})`,
-    );
 
     if (this.rotateTween) this.rotateTween.kill();
     this.rotateTween = gsap.to(this.wrapper.rotation, {
@@ -226,23 +236,12 @@ export class FarmAnimal {
     });
   }
 
-  public updateMixer(delta: number) {
+  // update მეთოდი იღებს კამერას, რომ ბარმა მუდმივად კამერისკენ იყუროს
+  public update(delta: number, camera: THREE.Camera) {
     this.mixer?.update(delta);
-  }
 
-  public getUIData(camera: THREE.Camera, width: number, height: number) {
-    const pos2D = this.progressFill.get2DPosition(camera, width, height);
-
-    if (pos2D) {
-      return {
-        id: this.id,
-        x: pos2D.x,
-        y: pos2D.y,
-        progress: this.progressFill.progress,
-        isReady: this.progressFill.isReady,
-        reward: this.reward,
-      };
+    if (this.animaProgressFill) {
+       this.animaProgressFill.updateLookAt(camera);
     }
-    return null;
   }
 }

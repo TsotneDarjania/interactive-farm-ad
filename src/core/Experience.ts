@@ -8,9 +8,10 @@ import { FarmAnimal } from "../world/FarmAnimal";
 import { globalEvents } from "./EventBus";
 import { Farmer } from "../world/Farmer";
 import { Wheat } from "../world/Wheat";
+import { AnimaProgressFill } from "../world/animalProgressFill";
 
 // მენეჯერები
-import { assetCache } from "./ModelLoader"; // <--- გლობალური ლოადერი
+import { assetCache } from "./ModelLoader"; 
 import { CameraManager } from "./CameraManager";
 import { Environment } from "../world/Environemnt";
 import { ParticleSystem } from "../world/ParticalSystem";
@@ -51,7 +52,7 @@ export class Experience {
 
     this.cameraManager = new CameraManager(pixiCanvas);
     this.camera = this.cameraManager.camera;
-    this.environment = new Environment(this.scene); // აღარ ვაწვდით ლოადერს!
+    this.environment = new Environment(this.scene); 
     this.particleSystem = new ParticleSystem(this.scene);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -68,11 +69,9 @@ export class Experience {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     try {
-      // 1. ჯერ ვტვირთავთ ყველაფერს გლობალურ ქეშში!
       await assetCache.preloadAllModels(ASSET_PATHS);
       await assetCache.preloadAllTextures(TEXTURE_PATHS);
 
-      // 2. მხოლოდ ახლა, როცა ქეში სავსეა, ვაშენებთ სამყაროს!
       this.environment.loadGround();
       this.loadFarmer();
       this.spawnWheat();
@@ -86,6 +85,7 @@ export class Experience {
     this.animate();
     window.addEventListener("resize", () => this.onResize());
     window.addEventListener("pointerdown", (e) => this.onPointerDown(e));
+    window.addEventListener("pointermove", (e) => this.onPointerMove(e));
   }
 
   public spawnFence() {
@@ -93,8 +93,6 @@ export class Experience {
     const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 
     this.fence = new Fence(this.scene, targetPos);
-    // შეგვიძლია farmItems-ში ჩავაგდოთ, თუ update სჭირდება (ვეიპოინტისთვის)
-    // this.farmItems.push(fenceObj as any);
   }
 
   private loadFarmer() {
@@ -122,15 +120,13 @@ export class Experience {
     this.wheat = new Wheat(this.scene, targetPos, 25);
   }
 
-  // spawnFromObjects - მხოლოდ spawn-ის ლოგიკა
   public spawnFromObjects(objectName: string) {
     const config = SpawnConfig[objectName] || DefaultConfig;
     const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 
-    const { scene: model, animations } = assetCache.getModel(objectName); // ← animations დაემატა
+    const { scene: model, animations } = assetCache.getModel(objectName); 
 
     this.particleSystem.createDustParticles(targetPos)
-    // setTimeout(() => this.particleSystem.createDustParticles(targetPos), 0);
 
     if (objectName !== ObjectType.FENCE) {
       const itemData = UI_ITEMS.find((i) => i.id === objectName);
@@ -140,7 +136,7 @@ export class Experience {
         model,
         targetPos,
         config,
-        animations, // ← ეს დაემატა
+        animations, 
         itemData?.price || 25,
       );
       this.scene.add(newItem.wrapper);
@@ -174,7 +170,9 @@ export class Experience {
 
   public resetItemProgress(id: string) {
     const item = this.farmItems.find((i) => i.id === id);
-    if (item && item.progressFill) item.progressFill.startProgress();
+    if (item && item instanceof FarmAnimal) {
+       item.startProducing(); 
+    }
   }
 
   public hasSpaceFor(objectName: string): boolean {
@@ -200,34 +198,23 @@ export class Experience {
     this.cameraManager.update();
 
     this.farmItems.forEach((item) => {
-      // mixer update - ანიმაციებისთვის
       if (item instanceof FarmAnimal) {
-        item.updateMixer(delta); // ← ეს აკლდა!
+        item.update(delta, this.cameraManager.camera); 
       }
 
-      if ("update" in item && typeof (item as any).update === "function") {
+      if ("update" in item && typeof (item as any).update === "function" && !(item instanceof FarmAnimal)) {
         (item as any).update(this.cameraManager.camera);
       }
     });
 
     this.wheat.update(this.cameraManager.camera);
-
-    // const uiData = this.farmItems
-    //   .map((item) =>
-    //     item.getUIData(
-    //       this.cameraManager.camera,
-    //       window.innerWidth,
-    //       window.innerHeight,
-    //     ),
-    //   )
-    //   .filter((d) => d !== null);
-
-    // globalEvents.emit("sync-world-ui", uiData);
+    
     this.renderer.render(this.scene, this.cameraManager.camera);
   }
 
-  private onPointerDown(event: PointerEvent) {
-    // ვქმნით ლოკალურად - კლასის თავიდან შეგიძლია საერთოდ წაშალო mouse-ის დეკლარაცია
+  private onPointerMove(event: PointerEvent) {
+    if (!this.cameraManager || !this.scene) return;
+
     const mouse = new THREE.Vector2(
       (event.clientX / window.innerWidth) * 2 - 1,
       -(event.clientY / window.innerHeight) * 2 + 1,
@@ -235,7 +222,32 @@ export class Experience {
 
     this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
 
-    // ვამოწმებთ მხოლოდ იმ ობიექტებს, რომლებიც სცენაშია
+    const intersects = this.raycaster.intersectObjects(
+      this.scene.children,
+      true
+    );
+
+    if (intersects.length > 0) {
+      const firstHit = intersects[0].object;
+
+      if (firstHit.userData && firstHit.userData.isCoin) {
+        const progressFillClass = firstHit.userData.parentFill as AnimaProgressFill;
+        
+        if (progressFillClass && progressFillClass.isCoinReady) {
+            progressFillClass.collectCoin(this.cameraManager.camera);
+        }
+      }
+    }
+  }
+
+  private onPointerDown(event: PointerEvent) {
+    const mouse = new THREE.Vector2(
+      (event.clientX / window.innerWidth) * 2 - 1,
+      -(event.clientY / window.innerHeight) * 2 + 1,
+    );
+
+    this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
+
     const intersects = this.raycaster.intersectObjects(
       this.scene.children,
       true,
@@ -244,10 +256,8 @@ export class Experience {
     if (intersects.length > 0) {
       let current: THREE.Object3D | null = intersects[0].object;
 
-      // ავდივართ იერარქიაში მაღლა, სანამ არ ვიპოვით პატრონ კლასს (ხორბალს)
       while (current) {
         if (current.userData.parentEntity) {
-          // ვეუბნებით ხორბალს: "შენს ვეიპოინტს დააკლიკეს, მიხედე საქმეს!"
           current.userData.parentEntity.handleInteraction();
           return;
         }
