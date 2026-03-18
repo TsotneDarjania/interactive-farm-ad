@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
+import { assetCache } from "../core/ModelLoader"; // <--- შემოვიტანეთ გლობალური ქეში
 
 export class Waypoint {
   public mesh: THREE.Group;
@@ -10,11 +11,55 @@ export class Waypoint {
     this.scene = scene;
     this.mesh = new THREE.Group();
     this.mesh.position.copy(position);
+    this.scene.add(this.mesh);
+    
     this.glowGroup = new THREE.Group();
     this.mesh.add(this.glowGroup);
-    this.scene.add(this.mesh);
 
+    // 1. ვქმნით ნეონის წრეებს
     this.createNeonEffect();
+    
+    // 2. ვტვირთავთ 3D მოდელს ლოუდერიდან
+    this.attach3DModel();
+
+    // 3. საწყისად ვმალავთ
+    this.hide(); 
+  }
+
+ private attach3DModel() {
+    try {
+      const { scene: model } = assetCache.getModel("waypoint");
+      
+      // 1. ზომა დავტოვოთ შესამჩნევი (მაგალითად 15)
+      const scale = 4; 
+      model.scale.set(scale, scale, scale);
+      
+      // ოდნავ ავწიოთ ზემოთ მოდელი ჯგუფის შიგნით, რომ წრეებს არ ეჯახებოდეს
+      model.position.y = 0; 
+      
+      this.mesh.add(model);
+
+      model.traverse((c) => {
+        if ((c as THREE.Mesh).isMesh) {
+          const m = c as THREE.Mesh;
+          m.castShadow = true;
+          
+          // 2. დავუბრუნოთ ორიგინალი მატერიალები, მაგრამ DepthTest გამოვურთოთ,
+          // რომ მიწამ არ დაფაროს (Z-fighting-ის პრევენცია)
+          const materials = Array.isArray(m.material) ? m.material : [m.material];
+          materials.forEach(mat => {
+            mat.depthTest = true; // დავუბრუნოთ სტანდარტულს
+            if ('transparent' in mat) {
+              mat.transparent = true;
+              mat.opacity = 1; // ბოლომდე გამოვაჩინოთ
+            }
+          });
+        }
+      });
+
+    } catch (e) {
+      console.error("❌ შეცდომა Waypoint-ზე:", e);
+    }
   }
 
   private createNeonEffect() {
@@ -40,26 +85,13 @@ export class Waypoint {
     }
   }
 
-  public spawn(model: THREE.Group, scale: number) {
-    model.scale.set(scale, scale, scale);
-    this.mesh.add(model);
+  public show() {
+    this.mesh.visible = true;
+    console.log("✅ Waypoint გამოიძახა show()!"); // ტესტისთვის დავამატე, რომ კონსოლში გამოჩნდეს
+  }
 
-    model.traverse((c) => {
-      if ((c as THREE.Mesh).isMesh) {
-        const m = c as THREE.Mesh;
-        m.castShadow = true;
-        const materials = Array.isArray(m.material) ? m.material : [m.material];
-        materials.forEach(mat => {
-          if ('transparent' in mat) {
-            mat.transparent = true;
-            mat.opacity = 0.9;
-          }
-        });
-      }
-    });
-
-    // gsap.to(model.rotation, { y: Math.PI * 2, duration: 5, repeat: -1, ease: "none" });
-    // gsap.to(model.position, { y: 0.4, duration: 2, yoyo: true, repeat: -1, ease: "sine.inOut" });
+  public hide() {
+    this.mesh.visible = false;
   }
 
   public destroy() {

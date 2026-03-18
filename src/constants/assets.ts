@@ -1,3 +1,8 @@
+// აქ შეგიძლია დაამატო სხვა ტექსტურებიც მომავალში
+export const TEXTURE_PATHS: Record<string, string> = {
+  scythe: "/icons/scythe.png",
+};
+
 export const ASSET_PATHS: Record<string, string> = {
   // Animals
   chicken: "/gltf/animals/chicken.glb",

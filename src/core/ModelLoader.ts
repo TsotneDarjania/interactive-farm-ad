@@ -1,27 +1,74 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 
-export class ModelLoader {
-  private loader: GLTFLoader;
+export interface LoadedModel {
+  scene: THREE.Group;
+  animations: THREE.AnimationClip[];
+}
 
-  constructor() {
-    this.loader = new GLTFLoader();
+// სახელი შევცვალე AssetLoader-ით, რადგან მარტო მოდელებს აღარ ტვირთავს
+export class AssetLoader {
+  private gltfLoader = new GLTFLoader();
+  private textureLoader = new THREE.TextureLoader();
+
+  private modelCache: Map<string, LoadedModel> = new Map();
+  private textureCache: Map<string, THREE.Texture> = new Map();
+
+  // მოდელების პრილოუდი
+  public async preloadAllModels(paths: Record<string, string>): Promise<void> {
+    const keys = Object.keys(paths);
+    const promises = keys.map(async (key) => {
+      const gltf = await this.loadModelAsync(paths[key]);
+      this.modelCache.set(key, { scene: gltf.scene, animations: gltf.animations });
+    });
+    await Promise.all(promises);
+    console.log("✅ All models preloaded successfully!");
   }
 
-  // ტვირთავს GLTF/GLB მოდელს და აბრუნებს სცენას და ანიმაციებს
-  public async loadModel(path: string): Promise<{ scene: THREE.Group, animations: THREE.AnimationClip[] }> {
+  // ტექსტურების პრილოუდი
+  public async preloadAllTextures(paths: Record<string, string>): Promise<void> {
+    const keys = Object.keys(paths);
+    const promises = keys.map(async (key) => {
+      const texture = await this.loadTextureAsync(paths[key]);
+      this.textureCache.set(key, texture);
+    });
+    await Promise.all(promises);
+    console.log("✅ All textures preloaded successfully!");
+  }
+
+  private loadModelAsync(path: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.loader.load(
-        path,
-        (gltf) => {
-          resolve({ scene: gltf.scene, animations: gltf.animations });
-        },
-        undefined,
-        (error) => {
-          console.error(`Failed to load model from ${path}:`, error);
-          reject(error);
-        }
-      );
+      this.gltfLoader.load(path, resolve, undefined, reject);
     });
   }
+
+  private loadTextureAsync(path: string): Promise<THREE.Texture> {
+    return new Promise((resolve, reject) => {
+      this.textureLoader.load(path, resolve, undefined, reject);
+    });
+  }
+
+  // მოდელის წამოღება
+  public getModel(key: string): LoadedModel {
+    const cached = this.modelCache.get(key);
+    if (!cached) throw new Error(`Model [${key}] is not preloaded!`);
+    
+    return {
+      scene: SkeletonUtils.clone(cached.scene) as THREE.Group,
+      animations: cached.animations,
+    };
+  }
+
+  // ტექსტურის წამოღება
+  public getTexture(key: string): THREE.Texture {
+    const cached = this.textureCache.get(key);
+    if (!cached) throw new Error(`Texture [${key}] is not preloaded!`);
+    
+    return cached;
+  }
 }
+
+// !!! აი ეს არის მთავარი მაგია !!!
+// ვქმნით ერთიან გლობალურ ეგზემპლარს, რომელსაც ყველა გამოიყენებს
+export const assetCache = new AssetLoader();

@@ -1,21 +1,20 @@
 import * as THREE from "three";
 import { EventEmitter } from "pixi.js";
 import { ObjectType, UI_ITEMS } from "../constants/types";
-import { ASSET_PATHS } from "../constants/assets"; // <--- დარწმუნდი რომ დაიმპორტდა
+import { ASSET_PATHS, TEXTURE_PATHS } from "../constants/assets";
 import { PenManager } from "../world/PenManager";
 import { DefaultConfig, SpawnConfig } from "../constants/spawnConfig";
 import { FarmAnimal } from "../world/FarmAnimal";
 import { globalEvents } from "./EventBus";
 import { Farmer } from "../world/Farmer";
 import { Wheat } from "../world/Wheat";
-import { TutorialPositions } from "../constants/tutorialPositions";
 
 // მენეჯერები
-import { ModelLoader } from "./ModelLoader";
+import { assetCache } from "./ModelLoader"; // <--- გლობალური ლოადერი
 import { CameraManager } from "./CameraManager";
 import { Environment } from "../world/Environemnt";
 import { ParticleSystem } from "../world/ParticalSystem";
-import { Waypoint } from "../world/WayPoint";
+import { Fence } from "../world/Fance";
 
 type FarmItem = FarmAnimal | Wheat;
 
@@ -25,8 +24,6 @@ export class Experience {
   private scene!: THREE.Scene;
   private renderer!: THREE.WebGLRenderer;
 
-  // მენეჯერები
-  private modelLoader!: ModelLoader;
   private cameraManager!: CameraManager;
   private environment!: Environment;
   private particleSystem!: ParticleSystem;
@@ -35,15 +32,15 @@ export class Experience {
   private clock = new THREE.Clock();
   private farmItems: FarmItem[] = [];
   private farmer: Farmer | null = null;
-  private waypoint: Waypoint | null = null;
+  private raycaster = new THREE.Raycaster();
+
+  public fence!: Fence;
+  public wheat!: Wheat;
+
+  public camera!: THREE.Camera;
 
   constructor(threeCanvas: HTMLCanvasElement, pixiCanvas: HTMLCanvasElement) {
     this.init(threeCanvas, pixiCanvas);
-  }
-
-  public moveFarmerToAnotherPoint(objectName: string) {
-    const config = SpawnConfig[objectName] || DefaultConfig;
-    this.farmer!.moveTo(config.farmerStandPoint!);
   }
 
   private async init(
@@ -52,13 +49,11 @@ export class Experience {
   ) {
     this.scene = new THREE.Scene();
 
-    // მენეჯერების ინიციალიზაცია
-    this.modelLoader = new ModelLoader();
     this.cameraManager = new CameraManager(pixiCanvas);
-    this.environment = new Environment(this.scene, this.modelLoader);
+    this.camera = this.cameraManager.camera;
+    this.environment = new Environment(this.scene); // აღარ ვაწვდით ლოადერს!
     this.particleSystem = new ParticleSystem(this.scene);
 
-    // Renderer-ის კონფიგურაცია
     this.renderer = new THREE.WebGLRenderer({
       canvas: threeCanvas,
       antialias: true,
@@ -72,13 +67,17 @@ export class Experience {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // საწყისი ობიექტების შექმნა
-    this.spawnWheat();
-    this.spawnWaypoint();
-
     try {
-      await this.environment.loadGround();
-      await this.loadFarmer();
+      // 1. ჯერ ვტვირთავთ ყველაფერს გლობალურ ქეშში!
+      await assetCache.preloadAllModels(ASSET_PATHS);
+      await assetCache.preloadAllTextures(TEXTURE_PATHS);
+
+      // 2. მხოლოდ ახლა, როცა ქეში სავსეა, ვაშენებთ სამყაროს!
+      this.environment.loadGround();
+      this.loadFarmer();
+      this.spawnWheat();
+      this.spawnFence();
+
       this.startCinematicIntro();
     } catch (e) {
       console.error(e);
@@ -86,24 +85,20 @@ export class Experience {
 
     this.animate();
     window.addEventListener("resize", () => this.onResize());
+    window.addEventListener("pointerdown", (e) => this.onPointerDown(e));
   }
 
-  private async loadFarmer() {
-    // ვიყენებთ ASSET_PATHS-ს
-    const { scene, animations } = await this.modelLoader.loadModel(
-      ASSET_PATHS.farmer,
-    );
-    this.farmer = new Farmer(scene, animations, 1.2);
-    this.farmer.mesh.position.set(-1, 4.2, 15);
-    this.farmer.mesh.rotation.y = Math.PI;
+  public spawnFence() {
+    const config = SpawnConfig[ObjectType.FENCE] || DefaultConfig;
+    const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 
-    this.farmer.mesh.traverse((c) => {
-      if ((c as THREE.Mesh).isMesh) {
-        c.castShadow = true;
-        c.receiveShadow = true;
-      }
-    });
-    this.scene.add(this.farmer.mesh);
+    this.fence = new Fence(this.scene, targetPos);
+    // შეგვიძლია farmItems-ში ჩავაგდოთ, თუ update სჭირდება (ვეიპოინტისთვის)
+    // this.farmItems.push(fenceObj as any);
+  }
+
+  private loadFarmer() {
+    this.farmer = new Farmer(this.scene);
   }
 
   private startCinematicIntro() {
@@ -120,126 +115,61 @@ export class Experience {
     });
   }
 
-  private async spawnWaypoint() {
-    const config = SpawnConfig["waypoint"] || DefaultConfig;
-    const pos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
-
-    // ვიყენებთ ASSET_PATHS-ს
-    const { scene } = await this.modelLoader.loadModel(ASSET_PATHS.waypoint);
-    this.waypoint = new Waypoint(this.scene, pos);
-    this.waypoint.spawn(scene, config.scale || 1);
-    if (config.animation) config.animation(this.waypoint.mesh);
-  }
-
-  public async spawnWheat() {
+  public spawnWheat() {
     const config = SpawnConfig["wheat"] || DefaultConfig;
     const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 
-    if (this.farmer && config.farmerStandPoint) {
-      this.farmer.moveTo(config.farmerStandPoint);
-    }
-
-    // ვიყენებთ ASSET_PATHS-ს
-    const { scene: model } = await this.modelLoader.loadModel(
-      ASSET_PATHS.wheat,
-    );
-
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const finalScale =
-      (config.scale || 1) / (Math.max(size.x, size.y, size.z) || 1);
-
-    model.scale.setScalar(finalScale);
-    model.position.y = -box.getCenter(new THREE.Vector3()).y * finalScale;
-
-    const wheatObj = new Wheat(this.scene, targetPos, 25);
-    wheatObj.spawn(model);
-
-    if (config.animation) config.animation(wheatObj.mesh);
-
-    setTimeout(() => this.particleSystem.createDustParticles(targetPos), 400);
-
-    this.farmItems.push(wheatObj);
+    this.wheat = new Wheat(this.scene, targetPos, 25);
   }
 
-  public async spawnFromObjects(objectName: string) {
+  // spawnFromObjects - მხოლოდ spawn-ის ლოგიკა
+  public spawnFromObjects(objectName: string) {
     const config = SpawnConfig[objectName] || DefaultConfig;
     const targetPos = config.position?.clone() || new THREE.Vector3(0, 0, 0);
 
-    // ვიყენებთ ASSET_PATHS-ს დინამიურად
-    const modelPath = ASSET_PATHS[objectName];
-    if (!modelPath) {
-      console.error(`Asset path not found for: ${objectName}`);
-      return;
-    }
+    const { scene: model, animations } = assetCache.getModel(objectName); // ← animations დაემატა
 
-    const wrapper = new THREE.Group();
-    wrapper.position.copy(targetPos);
-    this.scene.add(wrapper);
-
-    const { scene: model } = await this.modelLoader.loadModel(modelPath);
-
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const finalScale =
-      (config.scale || 1) / (Math.max(size.x, size.y, size.z) || 1);
-
-    model.scale.setScalar(finalScale);
-    model.position.y = -box.getCenter(new THREE.Vector3()).y * finalScale;
-    wrapper.add(model);
-
-    wrapper.traverse((c) => {
-      if ((c as THREE.Mesh).isMesh) {
-        c.castShadow = true;
-        c.receiveShadow = true;
-      }
-    });
-
-    if (config.animation) config.animation(wrapper);
-
-    setTimeout(() => this.particleSystem.createDustParticles(targetPos), 400);
+    this.particleSystem.createDustParticles(targetPos)
+    // setTimeout(() => this.particleSystem.createDustParticles(targetPos), 0);
 
     if (objectName !== ObjectType.FENCE) {
       const itemData = UI_ITEMS.find((i) => i.id === objectName);
       const newItem = new FarmAnimal(
         `anim_${Date.now()}`,
         objectName,
-        wrapper,
+        model,
+        targetPos,
+        config,
+        animations, // ← ეს დაემატა
         itemData?.price || 25,
       );
+      this.scene.add(newItem.wrapper);
       this.farmItems.push(newItem);
     }
   }
 
-  public movePlayerToViewpoint(pointKey: string, onCompleteEvent: string) {
-    console.log("movePlayerToViewpoint");
-    const config = TutorialPositions[pointKey];
-    if (!config || !this.farmer) return;
+  public async focusOnObject(objectId: string) {
+    const config = SpawnConfig[objectId];
+    if (!config) return;
 
-    this.farmer.moveToViewpoint(
-      config.playerPos,
-      config.playerRotation,
-      onCompleteEvent,
-    );
-    this.cameraManager.moveToViewpoint(config.cameraPos, config.cameraTarget);
-  }
+    if (config.cameraPos && config.cameraTarget) {
+      this.cameraManager.moveToViewpoint(config.cameraPos, config.cameraTarget);
+    }
 
-  public triggerWheatScythe() {
-    const wheatItem = this.farmItems.find(
-      (item) => item instanceof Wheat,
-    ) as Wheat;
-    if (wheatItem && typeof wheatItem.showScythe === "function") {
-      wheatItem.showScythe();
+    if (config.farmerStandPoint && this.farmer) {
+      await this.farmer.moveToViewpoint(
+        config.farmerStandPoint,
+        config.farmerRotation || 0,
+      );
     }
   }
 
-  public stopWheatScythe() {
-    const wheatItem = this.farmItems.find(
-      (item) => item instanceof Wheat,
-    ) as Wheat;
-    if (wheatItem && typeof wheatItem.hideScythe === "function") {
-      wheatItem.hideScythe();
-    }
+  public startWheatWorking() {
+    this.wheat.startWorkingProcess();
+  }
+
+  public stopWheatScytheWorking() {
+    this.wheat.stopWorking();
   }
 
   public resetItemProgress(id: string) {
@@ -249,6 +179,10 @@ export class Experience {
 
   public hasSpaceFor(objectName: string): boolean {
     return this.penManager.hasSpace(objectName);
+  }
+
+  public moveCameraToPlayPosition() {
+    this.cameraManager.moveCameraToPlayPosition();
   }
 
   private onResize() {
@@ -266,32 +200,59 @@ export class Experience {
     this.cameraManager.update();
 
     this.farmItems.forEach((item) => {
+      // mixer update - ანიმაციებისთვის
+      if (item instanceof FarmAnimal) {
+        item.updateMixer(delta); // ← ეს აკლდა!
+      }
+
       if ("update" in item && typeof (item as any).update === "function") {
         (item as any).update(this.cameraManager.camera);
       }
     });
 
-    const uiData = this.farmItems
-      .map((item) =>
-        item.getUIData(
-          this.cameraManager.camera,
-          window.innerWidth,
-          window.innerHeight,
-        ),
-      )
-      .filter((d) => d !== null);
+    this.wheat.update(this.cameraManager.camera);
 
-    globalEvents.emit("sync-world-ui", uiData);
+    // const uiData = this.farmItems
+    //   .map((item) =>
+    //     item.getUIData(
+    //       this.cameraManager.camera,
+    //       window.innerWidth,
+    //       window.innerHeight,
+    //     ),
+    //   )
+    //   .filter((d) => d !== null);
+
+    // globalEvents.emit("sync-world-ui", uiData);
     this.renderer.render(this.scene, this.cameraManager.camera);
   }
 
-  public resetWheatHarvest() {
-    const wheatItem = this.farmItems.find(
-      (item) => item instanceof Wheat,
-    ) as Wheat;
+  private onPointerDown(event: PointerEvent) {
+    // ვქმნით ლოკალურად - კლასის თავიდან შეგიძლია საერთოდ წაშალო mouse-ის დეკლარაცია
+    const mouse = new THREE.Vector2(
+      (event.clientX / window.innerWidth) * 2 - 1,
+      -(event.clientY / window.innerHeight) * 2 + 1,
+    );
 
-    if (wheatItem) {
-      wheatItem.resetHarvest();
+    this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
+
+    // ვამოწმებთ მხოლოდ იმ ობიექტებს, რომლებიც სცენაშია
+    const intersects = this.raycaster.intersectObjects(
+      this.scene.children,
+      true,
+    );
+
+    if (intersects.length > 0) {
+      let current: THREE.Object3D | null = intersects[0].object;
+
+      // ავდივართ იერარქიაში მაღლა, სანამ არ ვიპოვით პატრონ კლასს (ხორბალს)
+      while (current) {
+        if (current.userData.parentEntity) {
+          // ვეუბნებით ხორბალს: "შენს ვეიპოინტს დააკლიკეს, მიხედე საქმეს!"
+          current.userData.parentEntity.handleInteraction();
+          return;
+        }
+        current = current.parent;
+      }
     }
   }
 }

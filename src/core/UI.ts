@@ -92,9 +92,6 @@ export class UI {
     });
   }
 
-  public showStartHint() {
-    globalEvents.emit("tutorial-start");
-  }
 
   public showMenu() {
     if (this.currencyDisplay) {

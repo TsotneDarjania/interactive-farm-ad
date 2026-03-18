@@ -1,14 +1,13 @@
 import * as THREE from "three";
-import type { ModelLoader } from "../core/ModelLoader";
+import { assetCache } from "../core/ModelLoader"; // <--- შემოვიტანეთ გლობალური ქეში
 
 export class Environment {
   private scene: THREE.Scene;
-  private modelLoader: ModelLoader;
   public ground: THREE.Group | null = null;
 
-  constructor(scene: THREE.Scene, modelLoader: ModelLoader) {
+  // აღარ ითხოვს ლოადერს!
+  constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.modelLoader = modelLoader;
     
     this.initLights();
     this.initFog();
@@ -40,9 +39,10 @@ export class Environment {
     this.scene.fog = new THREE.Fog(0x87ceeb, 45, 120);
   }
 
-  public async loadGround(): Promise<void> {
+  public loadGround(): void {
     try {
-      const { scene: groundModel } = await this.modelLoader.loadModel("/gltf/ground.glb");
+      // ამოაქვს ეგრევე გლობალური ქეშიდან!
+      const { scene: groundModel } = assetCache.getModel("ground");
       this.ground = groundModel;
       
       this.ground.traverse((c) => {

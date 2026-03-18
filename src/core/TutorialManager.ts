@@ -1,82 +1,73 @@
-import { globalEvents } from "./EventBus";
-import { ObjectType } from "../constants/types";
-import type { UI } from "./UI";
+// import { ObjectType } from "../constants/types";
+// import { TutorialState, TUTORIAL_STEP } from "../constants/tutorialSteps";
+// import type { UI } from "./UI";
+// import type { Experience } from "./Experience";
 
-export class TutorialManager {
-  private ui: UI;
-  private phase = 0;
-  private clickHandler: ((e: Event) => void) | null = null;
+// export class TutorialManager {
+//   private ui: UI;
+//   private experience: Experience;
+//   private state: TutorialState = TutorialState.INIT;
 
-  constructor(ui: UI) {
-    this.ui = ui;
-    this.setupEvents();
-  }
+//   constructor(ui: UI, experience: Experience) {
+//     this.ui = ui;
+//     this.experience = experience;
+//   }
 
-  private setupEvents() {
-    globalEvents.on("tutorial-start", () => this.startPhase1());
-    globalEvents.on("waypoint-reached", () => this.startPhase2());
-    // როგორც კი ფული აიღო, ეგრევე გადავდივართ ყიდვის ფაზაზე (არანაირი ლოდინი!)
-    globalEvents.on("harvest-complete", () => this.startPhase3()); 
-  }
+//   public async handleEvent(eventName: string, payload?: any) {
+//     switch (this.state) {
+        
+//       case TutorialState.INIT:
+//         if (eventName === "START") {
+//         //   this.state = TutorialState.WAITING_FOR_MOVE;
+//           this.ui.showMenu();
+//         }
+//         break;
 
-  // ფაზა 1: ინტრო დასრულდა, ველოდებით პირველ კლიკს რომ ფერმერი გავაქციოთ
-  private startPhase1() {
-    this.phase = 1;
-    this.ui.showMenu();
-    
-    // ვბლოკავთ შოპში ყველაფერს, ღობის გარდა
-    if ((this.ui as any).shopMenu && (this.ui as any).shopMenu.enableOnly) {
-      (this.ui as any).shopMenu.enableOnly(ObjectType.FENCE);
-    }
+//       case TutorialState.WAITING_FOR_MOVE:
+//         if (eventName === "CLICKED_SCREEN") {
+//           this.state = TutorialState.HARVESTING;
+//           this.ui.setTutorialTarget(null); // ვმალავთ საწყის თითს
+          
+//           // ფერმერი მიდის
+//           await this.experience.focusOnObject("wheat");
+          
+//           // იწყება თიბვა
+//           this.ui.setTutorialTarget({ type: "world-spot", id: "wheat_harvest" });
+//           this.experience.triggerWheatScythe();
+//         }
+//         break;
 
-    this.waitForClick(() => {
-      if (this.phase === 1) {
-        globalEvents.emit("player-move-to-wheat");
-      }
-    });
-  }
+//       case TutorialState.HARVESTING:
+//         if (eventName === "GOLD_COLLECTED") {
+//           this.state = TutorialState.BUYING_FENCE;
+          
+//           // კამერა ბრუნდება, ვანთებთ შოპს
+//           this.experience.moveCameraToPlayPosition();
+//           this.ui.setTutorialTarget({ type: "menu", id: ObjectType.FENCE });
+//         }
+//         break;
 
-  // ფაზა 2: ფერმერი მივიდა, ვიწყებთ თიბვას 
-  private startPhase2() {
-    this.phase = 2;
-    this.ui.setTutorialTarget({ type: "world-spot", id: "wheat_harvest" });
-    globalEvents.emit("start-harvesting");
-  }
+//       case TutorialState.BUYING_FENCE:
+//         if (eventName === "ITEM_BOUGHT" && payload === ObjectType.FENCE) {
+//           this.state = TutorialState.COMPLETED;
+          
+//           this.ui.setTutorialTarget(null);
+//           if ((this.ui as any).shopMenu) {
+//             (this.ui as any).shopMenu.enableOnly(null); // ყველაფერი იხსნება
+//           }
 
-  // ფაზა 3: ფული გაფრინდა, ეგრევე ვანთებთ თითს შოპზე!
-  private startPhase3() {
-    if (this.phase !== 2) return;
-    this.phase = 3;
-        // === აქ ვეუბნებით, რომ თითი ზუსტად ღობეს დაადოს! ===
-    this.ui.setTutorialTarget({ type: "menu", id: ObjectType.FENCE }); 
-  }
+//           // ფერმერი მიდის ღობესთან
+//           await this.experience.focusOnObject(ObjectType.FENCE);
+//         }
+//         break;
 
-  // ფაზა 4: ტუტორიალი დასრულდა
-  public completeTutorial() {
-    this.phase = 4;
-    this.ui.setTutorialTarget(null);
-    // ვხსნით ბლოკს შოპზე (სხვა ცხოველებიც გამოჩნდება)
-    if ((this.ui as any).shopMenu && (this.ui as any).shopMenu.enableOnly) {
-      (this.ui as any).shopMenu.enableOnly(null);
-    }
-  }
+//       case TutorialState.COMPLETED:
+//         // ტუტორიალი მორჩა, აქ აღარაფერს ვაკეთებთ
+//         break;
+//     }
+//   }
 
-  public getPhase(): number {
-    return this.phase;
-  }
-
-  // ვიყენებთ მხოლოდ თამაშის დაწყებისას ერთხელ დასაკლიკად
-  private waitForClick(callback: () => void) {
-    if (this.clickHandler) {
-      window.removeEventListener("pointerdown", this.clickHandler);
-    }
-    
-    this.clickHandler = (e: Event) => {
-      window.removeEventListener("pointerdown", this.clickHandler!);
-      this.clickHandler = null;
-      callback();
-    };
-    
-    window.addEventListener("pointerdown", this.clickHandler);
-  }
-}
+//   public getState(): TutorialState {
+//     return this.state;
+//   }
+// }

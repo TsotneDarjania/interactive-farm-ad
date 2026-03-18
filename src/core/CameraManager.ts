@@ -97,4 +97,38 @@ export class CameraManager {
       ease: "power2.inOut",
     });
   }
+
+  // === ეს არის ის ახალი მეთოდი, რომელიც გაკლდა ===
+  public moveCameraToPlayPosition() {
+    const isMobile = window.innerWidth < 768;
+
+    // საით უნდა იყურებოდეს კამერა თამაშის დროს (შენი ფერმის ცენტრი)
+    const targetLookAt = isMobile ? { x: 0, y: 4, z: 0 } : { x: 5, y: 4, z: 0 };
+
+    // სად უნდა იდგეს კამერა (სიმაღლე და დაშორება)
+    const targetPos = isMobile
+      ? { x: 25, y: 25, z: 25 }
+      : { x: 40, y: 35, z: 40 };
+
+    // კამერის პოზიციის ანიმაცია
+    gsap.to(this.camera.position, {
+      x: targetPos.x,
+      y: targetPos.y,
+      z: targetPos.z,
+      duration: 1.5,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        this.controls.update();
+      },
+    });
+
+    // კამერის სამიზნის (Target) ანიმაცია
+    gsap.to(this.controls.target, {
+      x: targetLookAt.x,
+      y: targetLookAt.y,
+      z: targetLookAt.z,
+      duration: 1.5,
+      ease: "power2.inOut",
+    });
+  }
 }

@@ -9,7 +9,7 @@ export class ParticleSystem {
   }
 
   public createDustParticles(position: THREE.Vector3) {
-    const particleCount = 12;
+    const particleCount = 20;
     const geometry = new THREE.SphereGeometry(0.12, 6, 6);
     const material = new THREE.MeshBasicMaterial({
       color: 0xddddaa,
@@ -18,7 +18,7 @@ export class ParticleSystem {
     });
 
     const particles = new THREE.Group();
-    particles.position.set(position.x, position.y + 0.1, position.z);
+    particles.position.set(position.x, position.y - 0.1, position.z);
     this.scene.add(particles);
 
     for (let i = 0; i < particleCount; i++) {

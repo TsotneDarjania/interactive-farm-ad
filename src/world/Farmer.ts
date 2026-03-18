@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
-import { globalEvents } from "../core/EventBus"; // დაგვჭირდება ივენთის გასასროლად
+import { assetCache } from "../core/ModelLoader"; // <--- შემოვიტანეთ ქეში
 
 export type FarmerAnimation = 
   | "Death" | "Duck" | "HitReact" | "Idle" 
@@ -14,21 +14,37 @@ export class Farmer {
   private mixer: THREE.AnimationMixer;
   private actions: Map<string, THREE.AnimationAction> = new Map();
   private currentAction: THREE.AnimationAction | null = null;
-  public isMoving: boolean = false; // public გავხადე, რომ გარედან წავიკითხოთ
+  public isMoving: boolean = false; 
 
-  constructor(model: THREE.Group, animations: THREE.AnimationClip[], scale: number = 0.5) {
+  // ახლა კონსტრუქტორს სჭირდება მხოლოდ სცენა!
+  constructor(scene: THREE.Scene) {
+    // 1. თავისით იღებს მოდელს ქეშიდან
+    const { scene: model, animations } = assetCache.getModel("farmer");
+    
     this.mesh = model;
     this.mesh.visible = true;
-    this.mesh.scale.set(scale, scale, scale);
-    this.mesh.rotation.y = 0
+    
+    // 2. თავისით ისწორებს ზომას, პოზიციას და როტაციას
+    this.mesh.scale.set(1.2, 1.2, 1.2);
+    this.mesh.position.set(-1, 4.2, 15);
+    this.mesh.rotation.y = Math.PI;
 
+    // 3. თავისით ირთავს ჩრდილებს
+    this.mesh.traverse((c) => {
+      if ((c as THREE.Mesh).isMesh) {
+        c.castShadow = true;
+        c.receiveShadow = true;
+      }
+    });
+
+    // 4. ამატებს თავის თავს სცენაზე
+    scene.add(this.mesh);
+
+    // 5. რთავს ანიმაციებს
     this.mixer = new THREE.AnimationMixer(this.mesh);
-
     animations.forEach((anim) => {
       this.actions.set(anim.name, this.mixer.clipAction(anim));
     });
-
-    
 
     this.playAnimation("Idle", 0);
   }
@@ -76,36 +92,36 @@ export class Farmer {
     });
   }
 
-  // === ახალი: გაქცევა ვეიპოინტთან და ივენთის გასროლა ===
-  public moveToViewpoint(targetPos: THREE.Vector3, targetRotation: number, eventName: string) {
-    this.isMoving = true;
-    const lookPos = new THREE.Vector3(targetPos.x, this.mesh.position.y, targetPos.z);
-    this.mesh.lookAt(lookPos);
-    this.playAnimation("Run"); // სირბილი
+  // === სენიორული მიდგომა: Promise-ის დაბრუნება ივენთის ნაცვლად ===
+  public moveToViewpoint(targetPos: THREE.Vector3, targetRotation: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.isMoving = true;
+      const lookPos = new THREE.Vector3(targetPos.x, this.mesh.position.y, targetPos.z);
+      this.mesh.lookAt(lookPos);
+      this.playAnimation("Run"); 
 
-    const distance = this.mesh.position.distanceTo(lookPos);
-    const speed = 12;
-    const duration = distance / speed;
+      const distance = this.mesh.position.distanceTo(lookPos);
+      const speed = 12;
+      const duration = distance / speed;
 
-    gsap.to(this.mesh.position, {
-      x: targetPos.x,
-      z: targetPos.z,
-      duration: duration,
-      ease: "none",
-      onComplete: () => {
-        this.isMoving = false;
-        this.playAnimation("Idle");
-        
-        // 1. მირბენის მერე ვტრიალდებით სასურველ მხარეს
-        gsap.to(this.mesh.rotation, {
-          y: targetRotation,
-          duration: 0.5,
-          onComplete: () => {
-            // 2. ვისვრით ივენთს, რომ მივედით!
-            globalEvents.emit(eventName);
-          }
-        });
-      }
+      gsap.to(this.mesh.position, {
+        x: targetPos.x,
+        z: targetPos.z,
+        duration: duration,
+        ease: "none",
+        onComplete: () => {
+          this.isMoving = false;
+          this.playAnimation("Idle");
+          
+          gsap.to(this.mesh.rotation, {
+            y: targetRotation,
+            duration: 0.5,
+            onComplete: () => {
+              resolve(); 
+            }
+          });
+        }
+      });
     });
   }
 
