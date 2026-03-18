@@ -40,12 +40,10 @@ export class Wheat {
     const waypointPos = this.position.clone().add(waypointOffset);
     this.waypoint = new Waypoint(this.scene, waypointPos);
 
-    // !!! მთავარი კავშირი - ვასწავლით Waypoint-ს რა ქნას დაჭერისას !!!
     this.waypoint.onClick = () => {
       this.handleInteraction();
     };
 
-    // ხორბალზე დაჭერაც რომ მუშაობდეს
     this.mesh.userData.parentEntity = this;
 
     this.setupModel();
@@ -88,7 +86,6 @@ export class Wheat {
         stalk.rotation.y = Math.random() * Math.PI;
         stalk.scale.multiplyScalar(0.8 + Math.random() * 0.4);
 
-        // თითოეულ ღეროსაც ვაბამთ, რომ მასზე დაჭერამაც იმუშაოს
         stalk.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
              child.userData.parentEntity = this;

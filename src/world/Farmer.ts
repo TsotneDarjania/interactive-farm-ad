@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
-import { assetCache } from "../core/ModelLoader"; // <--- შემოვიტანეთ ქეში
+import { assetCache } from "../core/ModelLoader"; 
 
 export type FarmerAnimation = 
   | "Death" | "Duck" | "HitReact" | "Idle" 
@@ -16,20 +16,16 @@ export class Farmer {
   private currentAction: THREE.AnimationAction | null = null;
   public isMoving: boolean = false; 
 
-  // ახლა კონსტრუქტორს სჭირდება მხოლოდ სცენა!
   constructor(scene: THREE.Scene) {
-    // 1. თავისით იღებს მოდელს ქეშიდან
     const { scene: model, animations } = assetCache.getModel("farmer");
     
     this.mesh = model;
     this.mesh.visible = true;
     
-    // 2. თავისით ისწორებს ზომას, პოზიციას და როტაციას
     this.mesh.scale.set(1.2, 1.2, 1.2);
     this.mesh.position.set(-1, 4.2, 15);
     this.mesh.rotation.y = 0
 
-    // 3. თავისით ირთავს ჩრდილებს
     this.mesh.traverse((c) => {
       if ((c as THREE.Mesh).isMesh) {
         c.castShadow = true;
@@ -37,10 +33,8 @@ export class Farmer {
       }
     });
 
-    // 4. ამატებს თავის თავს სცენაზე
     scene.add(this.mesh);
 
-    // 5. რთავს ანიმაციებს
     this.mixer = new THREE.AnimationMixer(this.mesh);
     animations.forEach((anim) => {
       this.actions.set(anim.name, this.mixer.clipAction(anim));
@@ -67,7 +61,6 @@ export class Farmer {
     }
   }
 
-  // === სენიორული მიდგომა: Promise-ის დაბრუნება ივენთის ნაცვლად ===
   public moveToViewpoint(targetPos: THREE.Vector3, targetRotation: number): Promise<void> {
     return new Promise((resolve) => {
       this.isMoving = true;

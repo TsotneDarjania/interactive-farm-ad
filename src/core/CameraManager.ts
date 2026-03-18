@@ -1,12 +1,10 @@
 import * as THREE from "three";
 import { gsap } from "gsap";
-// აღარ გვჭირდება: import { OrbitControls } ...
 
 export class CameraManager {
   public camera: THREE.PerspectiveCamera;
   private targetFOV = 45;
   
-  // კამერის სამიზნე წერტილი, რომელსაც ანიმაციით შევცვლით
   public lookAtTarget: THREE.Vector3;
 
   constructor() {
@@ -18,7 +16,6 @@ export class CameraManager {
     );
     this.camera.position.set(60, 50, 60);
 
-    // საწყისი სამიზნე წერტილი (ცენტრი)
     this.lookAtTarget = new THREE.Vector3(0, 0, 0);
     this.camera.lookAt(this.lookAtTarget);
 
@@ -44,7 +41,6 @@ export class CameraManager {
   }
 
   public update() {
-    // ყოველ კადრში კამერა იყურება ჩვენს დინამიურ სამიზნეზე
     this.camera.lookAt(this.lookAtTarget);
   }
 
@@ -52,7 +48,6 @@ export class CameraManager {
     groundBoxCenter: THREE.Vector3,
     onComplete: () => void
   ) {
-    // ანიმაციის დაწყებამდე სამიზნე მივამაგროთ საწყის წერტილზე
     this.lookAtTarget.copy(groundBoxCenter);
     
     const zoom = window.innerWidth < window.innerHeight ? 20 : 25;
@@ -73,7 +68,6 @@ export class CameraManager {
     cameraPos: THREE.Vector3,
     cameraTarget: THREE.Vector3
   ) {
-    // კამერის პოზიციის ანიმაცია
     gsap.to(this.camera.position, {
       x: cameraPos.x,
       y: cameraPos.y,
@@ -82,7 +76,6 @@ export class CameraManager {
       ease: "power2.inOut",
     });
 
-    // კამერის სამიზნის (სად იყურება) ანიმაცია
     gsap.to(this.lookAtTarget, {
       x: cameraTarget.x,
       y: cameraTarget.y,
@@ -95,15 +88,12 @@ export class CameraManager {
   public moveCameraToPlayPosition() {
     const isMobile = window.innerWidth < 768;
 
-    // საით უნდა იყურებოდეს კამერა თამაშის დროს
     const targetLookAt = isMobile ? { x: 0, y: 4, z: 0 } : { x: 5, y: 4, z: 0 };
 
-    // სად უნდა იდგეს კამერა
     const targetPos = isMobile
       ? { x: 25, y: 25, z: 25 }
       : { x: 40, y: 35, z: 40 };
 
-    // კამერის პოზიციის ანიმაცია
     gsap.to(this.camera.position, {
       x: targetPos.x,
       y: targetPos.y,
@@ -112,7 +102,6 @@ export class CameraManager {
       ease: "power2.inOut",
     });
 
-    // კამერის სამიზნის ანიმაცია
     gsap.to(this.lookAtTarget, {
       x: targetLookAt.x,
       y: targetLookAt.y,

@@ -7,7 +7,6 @@ export interface LoadedModel {
   animations: THREE.AnimationClip[];
 }
 
-// სახელი შევცვალე AssetLoader-ით, რადგან მარტო მოდელებს აღარ ტვირთავს
 export class AssetLoader {
   private gltfLoader = new GLTFLoader();
   private textureLoader = new THREE.TextureLoader();
@@ -15,26 +14,29 @@ export class AssetLoader {
   private modelCache: Map<string, LoadedModel> = new Map();
   private textureCache: Map<string, THREE.Texture> = new Map();
 
-  // მოდელების პრილოუდი
   public async preloadAllModels(paths: Record<string, string>): Promise<void> {
     const keys = Object.keys(paths);
     const promises = keys.map(async (key) => {
       const gltf = await this.loadModelAsync(paths[key]);
-      this.modelCache.set(key, { scene: gltf.scene, animations: gltf.animations });
+      this.modelCache.set(key, {
+        scene: gltf.scene,
+        animations: gltf.animations,
+      });
     });
     await Promise.all(promises);
-    console.log("✅ All models preloaded successfully!");
+    console.log("All models preloaded successfully!");
   }
 
-  // ტექსტურების პრილოუდი
-  public async preloadAllTextures(paths: Record<string, string>): Promise<void> {
+  public async preloadAllTextures(
+    paths: Record<string, string>,
+  ): Promise<void> {
     const keys = Object.keys(paths);
     const promises = keys.map(async (key) => {
       const texture = await this.loadTextureAsync(paths[key]);
       this.textureCache.set(key, texture);
     });
     await Promise.all(promises);
-    console.log("✅ All textures preloaded successfully!");
+    console.log("All textures preloaded successfully!");
   }
 
   private loadModelAsync(path: string): Promise<any> {
@@ -49,26 +51,22 @@ export class AssetLoader {
     });
   }
 
-  // მოდელის წამოღება
   public getModel(key: string): LoadedModel {
     const cached = this.modelCache.get(key);
     if (!cached) throw new Error(`Model [${key}] is not preloaded!`);
-    
+
     return {
       scene: SkeletonUtils.clone(cached.scene) as THREE.Group,
       animations: cached.animations,
     };
   }
 
-  // ტექსტურის წამოღება
   public getTexture(key: string): THREE.Texture {
     const cached = this.textureCache.get(key);
     if (!cached) throw new Error(`Texture [${key}] is not preloaded!`);
-    
+
     return cached;
   }
 }
 
-// !!! აი ეს არის მთავარი მაგია !!!
-// ვქმნით ერთიან გლობალურ ეგზემპლარს, რომელსაც ყველა გამოიყენებს
 export const assetCache = new AssetLoader();

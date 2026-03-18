@@ -2,16 +2,16 @@ import * as THREE from "three";
 import { gsap } from "gsap";
 import { Howl } from "howler";
 import type { SpawnSettings } from "../constants/spawnConfig";
-import { globalEvents } from "../core/EventBus"; 
+import { globalEvents } from "../core/EventBus";
 import { AnimaProgressFill } from "./animalProgressFill";
 
 const ROAM_CONFIG = {
-  radius: 3.0,          
-  speed: 2,             
-  minIdle: 1000,        
-  maxIdle: 4000,        
-  hopHeight: 0.3,       
-  hopDuration: 0.3,     
+  radius: 3.0,
+  speed: 2,
+  minIdle: 1000,
+  maxIdle: 4000,
+  hopHeight: 0.3,
+  hopDuration: 0.3,
 };
 
 export class FarmAnimal {
@@ -77,7 +77,7 @@ export class FarmAnimal {
     }
 
     this.anchorPoint = this.wrapper.position.clone();
-    
+
     this.animaProgressFill = new AnimaProgressFill(id, this.wrapper, 5, reward);
 
     this.animalSound = new Howl({
@@ -93,9 +93,8 @@ export class FarmAnimal {
     this.playSound();
 
     setTimeout(() => this.startRoaming(), Math.random() * 2000);
-    
+
     this.startProducing();
-    // აქედან ამოვიღეთ this.pauseWork();
   }
 
   public startProducing() {
@@ -103,16 +102,16 @@ export class FarmAnimal {
     this.isProducing = true;
 
     this.animaProgressFill.startProgress(() => {
-        this.isProducing = false;
-        
-        globalEvents.emit("animal-product-ready", {
-            id: this.id,
-            type: this.type,
-            reward: this.reward,
-            sourceEntity: this
-        });
-        
-        console.log(`[${this.type}]-ის პროდუქტი მზადაა!`);
+      this.isProducing = false;
+
+      globalEvents.emit("animal-product-ready", {
+        id: this.id,
+        type: this.type,
+        reward: this.reward,
+        sourceEntity: this,
+      });
+
+      console.log(`[${this.type}]-product ready`);
     });
   }
 
@@ -128,9 +127,12 @@ export class FarmAnimal {
     if (!this.mixer || !this.animations.length) return;
 
     let clip = THREE.AnimationClip.findByName(this.animations, name);
-    
+
     if (!clip) {
-      clip = this.animations.find(a => a.name.toLowerCase().includes(name.toLowerCase())) || null;
+      clip =
+        this.animations.find((a) =>
+          a.name.toLowerCase().includes(name.toLowerCase()),
+        ) || null;
     }
 
     if (!clip) return;
@@ -199,7 +201,11 @@ export class FarmAnimal {
       ease: "power2.out",
     });
 
-    const targetPos = new THREE.Vector3(targetX, this.wrapper.position.y, targetZ);
+    const targetPos = new THREE.Vector3(
+      targetX,
+      this.wrapper.position.y,
+      targetZ,
+    );
     const distance = this.wrapper.position.distanceTo(targetPos);
     let duration = distance / ROAM_CONFIG.speed;
 
@@ -222,7 +228,7 @@ export class FarmAnimal {
       onComplete: () => {
         if (this.hopTween) this.hopTween.kill();
         this.wrapper.position.y = this.anchorPoint.y;
-        
+
         this.playAnim("Idle");
 
         const idleTime =
@@ -250,7 +256,7 @@ export class FarmAnimal {
     this.mixer?.update(delta);
 
     if (this.animaProgressFill) {
-       this.animaProgressFill.updateLookAt(camera);
+      this.animaProgressFill.updateLookAt(camera);
     }
   }
 }

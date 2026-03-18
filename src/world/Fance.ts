@@ -15,34 +15,27 @@ export class Fence {
   constructor(scene: THREE.Scene, position: THREE.Vector3) {
     this.scene = scene;
     this.position = position;
-    this.id = ObjectType.FENCE; // "fence"
+    this.id = ObjectType.FENCE; 
 
     this.mesh = new THREE.Group();
     this.mesh.position.copy(this.position);
     this.scene.add(this.mesh);
 
-    // 1. ვეიპოინტი ღობისთვის (მაგალითად, ოდნავ წინ დავსვათ)
     const waypointOffset = new THREE.Vector3(6, -0.7, 1);
     const waypointPos = this.position.clone().add(waypointOffset);
     this.waypoint = new Waypoint(this.scene, waypointPos);
 
-    // !!! შეცვლილია: ვაკავშირებთ Waypoint-ის კლიკს ღობის კლიკთან !!!
     this.waypoint.onClick = () => {
       this.handleInteraction();
     };
 
-    // 2. მოდელის აწყობა
     this.setupModel();
-
-    // ვაჩენთ ისარს
-    // this.showWaypoint();
   }
 
   private setupModel() {
     const config = SpawnConfig[ObjectType.FENCE] || DefaultConfig;
     const { scene: model } = assetCache.getModel("fence");
 
-    // ავტომატური სკეილინგი
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const finalScale = (config.scale || 1) / (Math.max(size.x, size.y, size.z) || 1);
@@ -52,25 +45,22 @@ export class Fence {
 
     this.mesh.add(model);
 
-    // ჩრდილები და Raycaster-ისთვის parentEntity-ის მიბმა
     model.traverse((c) => {
       if ((c as THREE.Mesh).isMesh) {
         c.castShadow = true;
         c.receiveShadow = true;
         
-        // !!! დამატებულია: ღობეზე პირდაპირ დაჭერამაც რომ იმუშაოს !!!
         c.userData.parentEntity = this; 
       }
     });
 
-    // სპავნ ანიმაცია კონფიგიდან
     if (config.animation) {
       config.animation(this.mesh);
     }
   }
 
   public handleInteraction() {
-    console.log("🪵 ღობეზე კლიკი - ვყიდულობთ!");
+    console.log("here........");
     globalEvents.emit("fance-clicked", { id: this.id });
   }
 

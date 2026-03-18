@@ -4,9 +4,7 @@ import { Howl } from "howler";
 import { globalEvents } from "./EventBus";
 import type { UI } from "./UI";
 import { EconomyManager } from "./EconomyManager";
-import { TutorialState } from "../constants/tutorialSteps";
 
-// ინტერფეისი ობიექტებისთვის, რომლებსაც აქვთ მუშაობის ციკლი
 interface WorkableItem {
   pauseWork?: () => void;
   resumeWork?: () => void;
@@ -24,8 +22,6 @@ export class GameLogic {
   private coinSound: Howl;
   private processingIds = new Set<string>();
   private playerIsOnPoint: PlayerPosition = "default";
-
-  // === ახალი ცვლადი ცხოველების დასათვლელად ===
   private purchasedAnimalsCount = 0;
 
   constructor(experience: Experience, ui: UI) {
@@ -71,7 +67,7 @@ export class GameLogic {
       "animal-coin-collected",
       (data: { reward: number; x: number; y: number; id: string }) => {
         if (!this.isInitialized || this.isGameOver) return;
-          this.coinSound.play();
+        this.coinSound.play();
         this.ui.spawnFlyingCoins(data.x, data.y, data.reward, data.id);
       },
     );
@@ -117,6 +113,8 @@ export class GameLogic {
     this.processingIds.add(id);
     this.economyManager.addGold(amount);
 
+    globalEvents.emit("harvest-complete", id);
+
     setTimeout(() => this.processingIds.delete(id), 500);
   }
 
@@ -140,21 +138,20 @@ export class GameLogic {
     this.experience.fence.showWaypoint();
 
     if (this.playerIsOnPoint !== "fence") {
-      const lastIndex = this.experience.farmItems.length - 1;
-      const newAnimal = this.experience.farmItems[lastIndex] as WorkableItem;
-      newAnimal?.pauseWork?.();
+      const lastAnimal = this.experience.farmItems[
+        this.experience.farmItems.length - 1
+      ] as WorkableItem;
+      lastAnimal?.pauseWork?.();
     }
 
-    // === ენდ სქრინის ტრიგერი მე-5 ყიდვისას ===
     this.purchasedAnimalsCount++;
 
-    if (this.purchasedAnimalsCount >= 8) {
+    if (this.purchasedAnimalsCount >= 7) {
       this.isGameOver = true;
 
-      // 1.5 წამით ვაყოვნებთ, რომ მოთამაშემ დაინახოს ნაყიდი ცხოველი სანამ რეკლამა ამოხტება
       setTimeout(() => {
         this.ui.showEndScreen("https://github.com/TsotneDarjania");
-        this.toggleAllAnimalsWork(false); // თამაშის დასრულებისას ყველაფერი გავაჩეროთ
+        this.toggleAllAnimalsWork(false);
         this.experience.stopWheatScytheWorking();
       }, 1500);
     }

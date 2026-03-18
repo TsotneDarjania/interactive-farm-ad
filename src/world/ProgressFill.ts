@@ -10,7 +10,6 @@ export class ProgressFill {
   public isReady = false;
   private tween: gsap.core.Tween | null = null;
 
-  // 3D ვიზუალის ცვლადები
   private barContainer: THREE.Group;
   private backgroundBar: THREE.Mesh;
   private fillBar: THREE.Mesh;
@@ -25,7 +24,6 @@ export class ProgressFill {
     this.barContainer.position.set(0, 4.5, 0);
     this.barContainer.visible = false;
 
-    // 1. თეთრი ჩარჩო (Border) ოდნავ დიდი ზომის
     const borderGeo = new THREE.PlaneGeometry(2.1, 0.4);
     const borderMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
@@ -34,7 +32,6 @@ export class ProgressFill {
     this.borderBar = new THREE.Mesh(borderGeo, borderMat);
     this.borderBar.position.z = -0.02;
 
-    // 2. ფონი (მუქი)
     const bgGeometry = new THREE.PlaneGeometry(2, 0.3);
     const bgMaterial = new THREE.MeshBasicMaterial({
       color: 0x222222,
@@ -43,7 +40,6 @@ export class ProgressFill {
     this.backgroundBar = new THREE.Mesh(bgGeometry, bgMaterial);
     this.backgroundBar.position.z = -0.01;
 
-    // 3. შესავსები ნაწილი (მკვეთრი მწვანე)
     const fillGeometry = new THREE.PlaneGeometry(2, 0.3);
     fillGeometry.translate(1, 0, 0);
     const fillMaterial = new THREE.MeshBasicMaterial({
@@ -62,15 +58,14 @@ export class ProgressFill {
     this.wrapper.add(this.barContainer);
   }
 
-  // ვამატებთ არჩევით პარამეტრს: onCompleteCb
   public startProgress(onCompleteCb?: () => void) {
     this.progress = 0;
     this.isReady = false;
 
     this.barContainer.visible = true;
     this.barContainer.scale.set(1, 1, 1);
-    this.barContainer.position.set(0, 4.5, 0); // დაზღვევა
-    this.fillBar.scale.x = 0.001; // დაზღვევა
+    this.barContainer.position.set(0, 4.5, 0);
+    this.fillBar.scale.x = 0.001;
 
     if (this.tween) {
       this.tween.kill();
@@ -90,7 +85,6 @@ export class ProgressFill {
         this.isReady = true;
         this.playCompleteEffect();
 
-        // ვატყობინებთ Wheat კლასს, რომ დასრულდა
         if (onCompleteCb) {
           onCompleteCb();
         }
@@ -98,9 +92,7 @@ export class ProgressFill {
     });
   }
 
-  // === ახალი: გაქრობა და მონეტების ამოფრქვევა ===
   private playCompleteEffect() {
-    // 1. ბარის ლამაზად გაქრობა (გადიდდება და ჩაქრება)
     gsap.to(this.barContainer.scale, {
       x: 1.5,
       y: 1.5,
@@ -109,30 +101,27 @@ export class ProgressFill {
     });
 
     gsap.to(this.barContainer.position, {
-      y: "+=1", // ოდნავ ზემოთ აიწევს
+      y: "+=1",
       duration: 0.3,
       ease: "power2.out",
       onComplete: () => {
         this.barContainer.visible = false;
-        this.barContainer.position.y -= 1; // ვარესეტებთ პოზიციას
+        this.barContainer.position.y -= 1;
       },
     });
 
-    // 2. 3D კოინების გაჩენა
     this.spawnCoins();
   }
 
   private spawnCoins() {
-    // ვქმნით პატარა 3D ცილინდრებს, რომლებიც მონეტებს ჰგვანან
     const coinGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.05, 16);
-    coinGeo.rotateX(Math.PI / 2); // ვაყენებთ ფასადით კამერისკენ
-    const coinMat = new THREE.MeshBasicMaterial({ color: 0xffd700 }); // ოქროსფერი
+    coinGeo.rotateX(Math.PI / 2);
+    const coinMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
 
-    // ვაფრქვევთ 5 ცალ მონეტას
     for (let i = 0; i < 5; i++) {
       const coin = new THREE.Mesh(coinGeo, coinMat);
-      coin.position.copy(this.barContainer.position); // იწყება ბარის პოზიციიდან
-      coin.position.x += Math.random() - 0.5; // ოდნავ მიმოფანტულად
+      coin.position.copy(this.barContainer.position);
+      coin.position.x += Math.random() - 0.5;
       this.wrapper.add(coin);
 
       const tl = gsap.timeline({
@@ -143,7 +132,6 @@ export class ProgressFill {
         },
       });
 
-      // კოინი ხტება ზემოთ, ცოტა გვერდზე და ტრიალებს
       tl.to(
         coin.position,
         {
@@ -159,14 +147,13 @@ export class ProgressFill {
       tl.to(
         coin.rotation,
         {
-          y: Math.PI * 4, // სწრაფი ბრუნვა
+          y: Math.PI * 4,
           duration: 0.6,
           ease: "none",
         },
         0,
       );
 
-      // ბოლოსკენ ქრება (Scale = 0)
       tl.to(
         coin.scale,
         {

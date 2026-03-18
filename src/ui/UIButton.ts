@@ -86,13 +86,11 @@ export class UIButton extends PIXI.Container {
     );
     this.on("pointerdown", () => {
       gsap.to(this.content.scale, { x: 0.9, y: 0.9, duration: 0.1 });
-      // GSAP-ის მაგივრად, პირდაპირ ვანიჭებთ ფერს 
       this.bg.tint = 0xeeeeee; 
     });
 
     const resetState = () => {
       gsap.to(this.content.scale, { x: 1, y: 1, duration: 0.1 }); 
-      // ვაბრუნებთ ორიგინალ ფერს მომენტალურად
       this.bg.tint = 0xffffff;
     };
 

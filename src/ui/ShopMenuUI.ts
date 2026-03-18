@@ -6,10 +6,6 @@ import { UI_ITEMS, ObjectType } from "../constants/types";
 export class ShopMenuUI extends PIXI.Container {
   public events = new PIXI.EventEmitter();
   private menuButtons: UIButton[] = [];
-  
-  // === ახალი: ტუტორიალის შეზღუდვისთვის ===
-  private allowedItemId: string | null = null; 
-  private currentStoredGold: number = 0;
 
   constructor() {
     super();
@@ -36,15 +32,9 @@ export class ShopMenuUI extends PIXI.Container {
     });
   }
 
-  // === ახალი მეთოდი ბლოკირებისთვის ===
-  public enableOnly(id: string | null) {
-    this.allowedItemId = id;
-    this.updateAffordability(this.currentStoredGold); // ვაახლებთ ვიზუალს
-  }
-
   public showMenu(screenHeight: number) {
     this.visible = true;
-    const targetY = screenHeight - 120 * this.scale.y; 
+    const targetY = screenHeight - 120 * this.scale.y;
 
     this.menuButtons.forEach((btn, i) => {
       gsap.from(btn.scale, {
@@ -64,17 +54,13 @@ export class ShopMenuUI extends PIXI.Container {
   }
 
   public updateAffordability(currentGold: number) {
-    this.currentStoredGold = currentGold; // ვიმახსოვრებთ ფულს
-
     this.menuButtons.forEach((btn) => {
       const itemData = UI_ITEMS.find((i) => i.id === btn.name);
       if (!itemData) return;
 
       const canAfford = currentGold >= itemData.price;
-      // ვამოწმებთ, ტუტორიალის მიერ დაბლოკილი ხომ არაა ეს კონკრეტული ღილაკი
-      const isAllowed = this.allowedItemId ? btn.name === this.allowedItemId : true;
-      
-      btn.setDisabled(!canAfford || !isAllowed);
+
+      btn.setDisabled(!canAfford);
     });
   }
 
@@ -88,9 +74,9 @@ export class ShopMenuUI extends PIXI.Container {
 
   public resize(width: number, height: number) {
     let scale = 1;
-    if (width < 400) scale = 0.45; 
-    else if (width < 600) scale = 0.55; 
-    else if (width < 800) scale = 0.75; 
+    if (width < 400) scale = 0.45;
+    else if (width < 600) scale = 0.55;
+    else if (width < 800) scale = 0.75;
 
     this.scale.set(scale);
     this.x = (width - this.getLocalBounds().width * scale) / 2;

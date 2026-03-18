@@ -5,7 +5,6 @@ export class Environment {
   private scene: THREE.Scene;
   public ground: THREE.Group | null = null;
 
-  // აღარ ითხოვს ლოადერს!
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     
@@ -41,7 +40,6 @@ export class Environment {
 
   public loadGround(): void {
     try {
-      // ამოაქვს ეგრევე გლობალური ქეშიდან!
       const { scene: groundModel } = assetCache.getModel("ground");
       this.ground = groundModel;
       

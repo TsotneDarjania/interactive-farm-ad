@@ -3,15 +3,12 @@ import { EventEmitter } from "pixi.js";
 import { gsap } from "gsap";
 import { ObjectType, UI_ITEMS } from "../constants/types";
 import { ASSET_PATHS, TEXTURE_PATHS } from "../constants/assets";
-import { PenManager } from "../world/PenManager";
 import { DefaultConfig, SpawnConfig } from "../constants/spawnConfig";
 import { FarmAnimal } from "../world/FarmAnimal";
 import { globalEvents } from "./EventBus";
 import { Farmer } from "../world/Farmer";
 import { Wheat } from "../world/Wheat";
 import { AnimaProgressFill } from "../world/animalProgressFill";
-
-// მენეჯერები
 import { assetCache } from "./ModelLoader";
 import { CameraManager } from "./CameraManager";
 import { Environment } from "../world/Environemnt";
@@ -23,23 +20,18 @@ export class Experience {
 
   private scene!: THREE.Scene;
   private renderer!: THREE.WebGLRenderer;
-
   private cameraManager!: CameraManager;
   private environment!: Environment;
   private particleSystem!: ParticleSystem;
-  private penManager = new PenManager();
-
   private clock = new THREE.Clock();
-  public farmItems: FarmAnimal[] = [];
-  private farmer: Farmer | null = null;
   private raycaster = new THREE.Raycaster();
 
+  public farmItems: FarmAnimal[] = [];
+  private farmer: Farmer | null = null;
   public fence!: Fence;
   public wheat!: Wheat;
-
   public camera!: THREE.Camera;
 
-  // === ისრის ცვლადები ===
   private arrow: THREE.Group | null = null;
   private arrowTween: gsap.core.Tween | null = null;
 
@@ -49,7 +41,6 @@ export class Experience {
 
   private async init(threeCanvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
-
     this.cameraManager = new CameraManager(); 
     this.camera = this.cameraManager.camera;
     this.environment = new Environment(this.scene);
@@ -77,10 +68,7 @@ export class Experience {
       this.loadFarmer();
       this.spawnWheat();
       this.spawnFence();
-      
-      // საწყისი ისარი ხორბალთან
       this.createArrow(new THREE.Vector3(10.4, 9, -3));
-
       this.startCinematicIntro();
     } catch (e) {
       console.error(e);
@@ -92,7 +80,6 @@ export class Experience {
     window.addEventListener("pointermove", (e) => this.onPointerMove(e));
   }
 
-  // === ARROW ლოგიკა ===
   public createArrow(position: THREE.Vector3) {
     if (!this.arrow) {
       const { scene: model } = assetCache.getModel("arrow");
@@ -117,10 +104,9 @@ export class Experience {
   }
 
   public hideArrow() {
-    if (this.arrow) {
-      this.arrow.visible = false;
-      if (this.arrowTween) this.arrowTween.kill();
-    }
+    if (!this.arrow) return;
+    this.arrow.visible = false;
+    this.arrowTween?.kill();
   }
 
   public spawnFence() {
@@ -140,7 +126,7 @@ export class Experience {
 
     this.cameraManager.startCinematicIntro(center, () => {
       globalEvents.emit("intro-complete");
-      if (this.farmer) this.farmer.waveHello();
+      this.farmer?.waveHello();
     });
   }
 
@@ -182,10 +168,7 @@ export class Experience {
     }
 
     if (config.farmerStandPoint && this.farmer) {
-      await this.farmer.moveToViewpoint(
-        config.farmerStandPoint,
-        config.farmerRotation || 0,
-      );
+      await this.farmer.moveToViewpoint(config.farmerStandPoint, config.farmerRotation || 0);
     }
   }
 
@@ -194,11 +177,12 @@ export class Experience {
 
   public resetItemProgress(id: string) {
     const item = this.farmItems.find((i) => i.id === id);
-    if (item && item instanceof FarmAnimal) item.startProducing();
+    if (item instanceof FarmAnimal) item.startProducing();
   }
 
-  public hasSpaceFor(objectName: string): boolean { return this.penManager.hasSpace(objectName); }
-  public moveCameraToPlayPosition() { this.cameraManager.moveCameraToPlayPosition(); }
+  public moveCameraToPlayPosition() { 
+    this.cameraManager.moveCameraToPlayPosition(); 
+  }
 
   private onResize() {
     const width = window.innerWidth;
@@ -211,14 +195,13 @@ export class Experience {
     requestAnimationFrame(() => this.animate());
     const delta = this.clock.getDelta();
 
-    if (this.farmer) this.farmer.update(delta);
+    this.farmer?.update(delta);
     this.cameraManager.update();
 
     this.farmItems.forEach((item) => {
       if (item instanceof FarmAnimal) {
         item.update(delta, this.cameraManager.camera);
-      }
-      if ("update" in item && typeof (item as any).update === "function" && !(item instanceof FarmAnimal)) {
+      } else if (typeof (item as any).update === "function") {
         (item as any).update(this.cameraManager.camera);
       }
     });
@@ -227,59 +210,49 @@ export class Experience {
     this.renderer.render(this.scene, this.cameraManager.camera);
   }
 
-  // Hover-ზე კოინის აღება
+  private getIntersects(event: PointerEvent): THREE.Intersection[] {
+    const mouse = new THREE.Vector2(
+      (event.clientX / window.innerWidth) * 2 - 1,
+      -(event.clientY / window.innerHeight) * 2 + 1
+    );
+    this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
+    return this.raycaster.intersectObjects(this.scene.children, true);
+  }
+
+  private processCoinInteraction(intersects: THREE.Intersection[]): boolean {
+    if (intersects.length === 0) return false;
+    const obj = intersects[0].object;
+
+    if (obj.userData?.isCoin) {
+      const fill = obj.userData.parentFill as AnimaProgressFill;
+      if (fill?.isCoinReady) {
+        fill.collectCoin(this.cameraManager.camera);
+        return true;
+      }
+    }
+    return false;
+  }
+
   private onPointerMove(event: PointerEvent) {
     if (!this.cameraManager) return;
-    this.checkCoinInteraction(event);
+    const intersects = this.getIntersects(event);
+    this.processCoinInteraction(intersects);
   }
 
-  // Tap/Click-ზე კოინის აღება ან ობიექტთან ინტერაქცია
   private onPointerDown(event: PointerEvent) {
     if (!this.cameraManager) return;
+    const intersects = this.getIntersects(event);
+    if (intersects.length === 0) return;
 
-    // 1. ჯერ ვამოწმებთ კოინს (რომ მობილურზე დაჭერითაც აიღოს)
-    const coinClass = this.checkCoinInteraction(event);
-    if (coinClass) return; // თუ კოინი აიღო, სხვა ინტერაქცია აღარ გვინდა
+    if (this.processCoinInteraction(intersects)) return;
 
-    // 2. თუ კოინი არ იყო, ვამოწმებთ სხვა ობიექტებს
-    const mouse = new THREE.Vector2(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
-    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-    if (intersects.length > 0) {
-      let current: THREE.Object3D | null = intersects[0].object;
-      while (current) {
-        if (current.userData.parentEntity) {
-          current.userData.parentEntity.handleInteraction();
-          return;
-        }
-        current = current.parent;
+    let current: THREE.Object3D | null = intersects[0].object;
+    while (current) {
+      if (current.userData?.parentEntity) {
+        current.userData.parentEntity.handleInteraction();
+        return;
       }
+      current = current.parent;
     }
-  }
-
-  // დამხმარე მეთოდი კოინის საპოვნელად (დუბლირების თავიდან ასაცილებლად)
-  private checkCoinInteraction(event: PointerEvent): AnimaProgressFill | null {
-    const mouse = new THREE.Vector2(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(mouse, this.cameraManager.camera);
-    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-    if (intersects.length > 0) {
-      const obj = intersects[0].object;
-      if (obj.userData && obj.userData.isCoin) {
-        const fill = obj.userData.parentFill as AnimaProgressFill;
-        if (fill && fill.isCoinReady) {
-          fill.collectCoin(this.cameraManager.camera);
-          return fill;
-        }
-      }
-    }
-    return null;
   }
 }

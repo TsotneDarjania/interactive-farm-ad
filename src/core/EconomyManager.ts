@@ -1,4 +1,3 @@
-import { globalEvents } from "./EventBus";
 import type { UI } from "./UI";
 
 export class EconomyManager {
@@ -7,24 +6,18 @@ export class EconomyManager {
 
   constructor(ui: UI) {
     this.ui = ui;
-    this.ui.setGameState(this.gold);
-
-    globalEvents.on("add-gold", (data: { id: string; amount: number }) => {
-      this.addGold(data.amount);
-      // როცა ფული დაგვემატება, ვეუბნებით სისტემას, რომ თიბვის ფაზა დასრულდა
-      globalEvents.emit("harvest-complete", data.id); 
-    });
+    this.updateUI();
   }
 
   public addGold(amount: number) {
     this.gold += amount;
-    this.ui.setGameState(this.gold);
+    this.updateUI();
   }
 
   public spendGold(amount: number): boolean {
     if (this.gold >= amount) {
       this.gold -= amount;
-      this.ui.setGameState(this.gold);
+      this.updateUI();
       return true;
     }
     return false;
@@ -32,5 +25,9 @@ export class EconomyManager {
 
   public getGold(): number {
     return this.gold;
+  }
+
+  private updateUI() {
+    this.ui.setGameState(this.gold);
   }
 }
