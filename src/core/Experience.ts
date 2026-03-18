@@ -38,17 +38,16 @@ export class Experience {
 
   public camera!: THREE.Camera;
 
-  constructor(threeCanvas: HTMLCanvasElement, pixiCanvas: HTMLCanvasElement) {
-    this.init(threeCanvas, pixiCanvas);
+  constructor(threeCanvas: HTMLCanvasElement) {
+    this.init(threeCanvas);
   }
 
   private async init(
     threeCanvas: HTMLCanvasElement,
-    pixiCanvas: HTMLCanvasElement,
   ) {
     this.scene = new THREE.Scene();
 
-    this.cameraManager = new CameraManager(pixiCanvas);
+    this.cameraManager = new CameraManager();
     this.camera = this.cameraManager.camera;
     this.environment = new Environment(this.scene); 
     this.particleSystem = new ParticleSystem(this.scene);

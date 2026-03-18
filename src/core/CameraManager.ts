@@ -1,27 +1,26 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { gsap } from "gsap";
-import { globalEvents } from "./EventBus";
+// აღარ გვჭირდება: import { OrbitControls } ...
 
 export class CameraManager {
   public camera: THREE.PerspectiveCamera;
-  public controls: OrbitControls;
   private targetFOV = 45;
+  
+  // კამერის სამიზნე წერტილი, რომელსაც ანიმაციით შევცვლით
+  public lookAtTarget: THREE.Vector3;
 
-  constructor(pixiCanvas: HTMLCanvasElement) {
+  constructor() {
     this.camera = new THREE.PerspectiveCamera(
       this.targetFOV,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000,
+      1000
     );
     this.camera.position.set(60, 50, 60);
 
-    this.controls = new OrbitControls(this.camera, pixiCanvas);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.enabled = false;
-    this.controls.maxPolarAngle = Math.PI / 2.1;
+    // საწყისი სამიზნე წერტილი (ცენტრი)
+    this.lookAtTarget = new THREE.Vector3(0, 0, 0);
+    this.camera.lookAt(this.lookAtTarget);
 
     this.updateFOV();
   }
@@ -45,16 +44,17 @@ export class CameraManager {
   }
 
   public update() {
-    if (this.controls.enabled) {
-      this.controls.update();
-    }
+    // ყოველ კადრში კამერა იყურება ჩვენს დინამიურ სამიზნეზე
+    this.camera.lookAt(this.lookAtTarget);
   }
 
   public startCinematicIntro(
     groundBoxCenter: THREE.Vector3,
-    onComplete: () => void,
+    onComplete: () => void
   ) {
-    this.controls.target.copy(groundBoxCenter);
+    // ანიმაციის დაწყებამდე სამიზნე მივამაგროთ საწყის წერტილზე
+    this.lookAtTarget.copy(groundBoxCenter);
+    
     const zoom = window.innerWidth < window.innerHeight ? 20 : 25;
 
     gsap.to(this.camera.position, {
@@ -63,12 +63,7 @@ export class CameraManager {
       z: groundBoxCenter.z + zoom + 5,
       duration: 2,
       ease: "power2.inOut",
-      onUpdate: () => {
-        this.camera.lookAt(groundBoxCenter);
-        this.controls.update();
-      },
       onComplete: () => {
-        this.controls.enabled = true;
         onComplete();
       },
     });
@@ -76,20 +71,19 @@ export class CameraManager {
 
   public moveToViewpoint(
     cameraPos: THREE.Vector3,
-    cameraTarget: THREE.Vector3,
+    cameraTarget: THREE.Vector3
   ) {
+    // კამერის პოზიციის ანიმაცია
     gsap.to(this.camera.position, {
       x: cameraPos.x,
       y: cameraPos.y,
       z: cameraPos.z,
       duration: 2.5,
       ease: "power2.inOut",
-      onUpdate: () => {
-        this.controls.update();
-      },
     });
 
-    gsap.to(this.controls.target, {
+    // კამერის სამიზნის (სად იყურება) ანიმაცია
+    gsap.to(this.lookAtTarget, {
       x: cameraTarget.x,
       y: cameraTarget.y,
       z: cameraTarget.z,
@@ -98,14 +92,13 @@ export class CameraManager {
     });
   }
 
-  // === ეს არის ის ახალი მეთოდი, რომელიც გაკლდა ===
   public moveCameraToPlayPosition() {
     const isMobile = window.innerWidth < 768;
 
-    // საით უნდა იყურებოდეს კამერა თამაშის დროს (შენი ფერმის ცენტრი)
+    // საით უნდა იყურებოდეს კამერა თამაშის დროს
     const targetLookAt = isMobile ? { x: 0, y: 4, z: 0 } : { x: 5, y: 4, z: 0 };
 
-    // სად უნდა იდგეს კამერა (სიმაღლე და დაშორება)
+    // სად უნდა იდგეს კამერა
     const targetPos = isMobile
       ? { x: 25, y: 25, z: 25 }
       : { x: 40, y: 35, z: 40 };
@@ -117,13 +110,10 @@ export class CameraManager {
       z: targetPos.z,
       duration: 1.5,
       ease: "power2.inOut",
-      onUpdate: () => {
-        this.controls.update();
-      },
     });
 
-    // კამერის სამიზნის (Target) ანიმაცია
-    gsap.to(this.controls.target, {
+    // კამერის სამიზნის ანიმაცია
+    gsap.to(this.lookAtTarget, {
       x: targetLookAt.x,
       y: targetLookAt.y,
       z: targetLookAt.z,

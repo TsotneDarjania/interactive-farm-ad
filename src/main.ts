@@ -9,7 +9,7 @@ const threeCanvas = document.getElementById(
 ) as HTMLCanvasElement;
 const pixiCanvas = document.getElementById("pixi-canvas") as HTMLCanvasElement;
 
-const experience = new Experience(threeCanvas, pixiCanvas);
+const experience = new Experience(threeCanvas);
 const ui = new UI(pixiCanvas);
 
 new GameLogic(experience, ui);
